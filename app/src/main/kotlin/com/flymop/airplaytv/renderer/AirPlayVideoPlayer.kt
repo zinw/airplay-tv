@@ -21,7 +21,12 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.VideoSize
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 // rate is 0 while buffering; speed is the configured rate regardless of pause state
 // native reads the effective rate, overlay reads playWhenReady + speed + skipSilence
@@ -63,6 +68,13 @@ class AirPlayVideoPlayer(private val context: Context) {
         }
         override fun onPlaybackStateChanged(state: Int) {
             if (state == Player.STATE_ENDED) onEnded?.invoke()
+            _reportPlaybackInfo()
+        }
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _reportPlaybackInfo()
+        }
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            _reportPlaybackInfo()
         }
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             // duration is usually established here (esp. hls): report so the held /play releases
@@ -76,12 +88,49 @@ class AirPlayVideoPlayer(private val context: Context) {
             val width = (videoSize.width * videoSize.pixelWidthHeightRatio).toInt()
             onVideoSize?.invoke(width, videoSize.height, width.toFloat() / videoSize.height)
         }
+        override fun onEvents(player: Player, events: Player.Events) {
+            _reportPlaybackInfo()
+        }
+    }
+
+    private fun createFastStartExoPlayer(): ExoPlayer {
+        // Fast-start buffering: reduce initial buffer threshold from default 2.5s down to 400ms
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 30_000,
+                /* bufferForPlaybackMs = */ 400,
+                /* bufferForPlaybackAfterRebufferMs = */ 1000
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        // Fast HTTP timeouts and keep-alive connection reuse
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setConnectTimeoutMs(4000)
+            .setReadTimeoutMs(8000)
+            .setAllowCrossProtocolRedirects(true)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+
+        // Instant video surface joining without waiting
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+            .setEnableDecoderFallback(true)
+            .setAllowedVideoJoiningTimeMs(0)
+
+        return ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
+            .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            .build()
     }
 
     fun play(location: String, startPositionSeconds: Float) = mainHandler.post {
         // recycling must not report the stopped sentinel: senders poll right after /play
         _stopInternal(reportStopped = false)
-        val p = ExoPlayer.Builder(context).build().also {
+        val p = createFastStartExoPlayer().also {
             it.addListener(_listener)
             pendingSurface?.let { s -> it.setVideoSurface(s) }
             pendingPlayerView?.let { pv -> pv.player = it }
@@ -90,7 +139,9 @@ class AirPlayVideoPlayer(private val context: Context) {
         p.setMediaItem(MediaItem.fromUri(location), (startPositionSeconds * 1000).toLong())
         p.playWhenReady = true
         p.prepare()
-        onPlaybackInfo?.invoke(PlaybackSnapshot(startPositionSeconds, 0f, 1f, false, true))
+        // Immediately acknowledge ready and rate to unlock iOS controls instantly
+        onPlaybackInfo?.invoke(PlaybackSnapshot(startPositionSeconds, 0f, 1f, true, true))
+        _reportPlaybackInfo()
         mainHandler.postDelayed(_reportTick, REPORT_INTERVAL_MS)
     }
 
@@ -199,6 +250,6 @@ class AirPlayVideoPlayer(private val context: Context) {
 
     companion object {
         private const val TAG = "AirPlayVideoPlayer"
-        private const val REPORT_INTERVAL_MS = 250L
+        private const val REPORT_INTERVAL_MS = 100L
     }
 }
