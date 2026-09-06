@@ -357,6 +357,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
+        app:surface_type="texture_view"
         app:use_controller="true"
         app:show_buffering="when_playing"
         app:show_timeout="4000" />

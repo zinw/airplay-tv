@@ -1,9 +1,21 @@
-# AirPlay TV 📺
+<div align="center">
+  <img src="docs/assets/app_icon.png" width="128" height="128" alt="AirPlay TV Icon" />
+  <h1>AirPlay TV</h1>
+  <p><strong>High-performance, open-source AirPlay receiver tailored specifically for Android TV &amp; Google TV.</strong></p>
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Platform](https://img.shields.io/badge/Platform-Android%20TV%208.0%2B-green.svg)](https://developer.android.com/tv)
-[![Architecture](https://img.shields.io/badge/Arch-arm64--v8a%20%7C%20armeabi--v7a%20%7C%20x86__64-orange.svg)](https://developer.android.com/ndk)
-[![Release](https://img.shields.io/github/v/release/flymop/airplay-tv?include_prereleases&color=brightgreen&label=Auto%20Release)](https://github.com/flymop/airplay-tv/releases)
+  <p>
+    <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3" /></a>
+    <a href="https://developer.android.com/tv"><img src="https://img.shields.io/badge/Platform-Android%20TV%208.0%2B-green.svg" alt="Platform" /></a>
+    <a href="https://developer.android.com/ndk"><img src="https://img.shields.io/badge/Arch-arm64--v8a%20%7C%20armeabi--v7a%20%7C%20x86__64-orange.svg" alt="Architecture" /></a>
+    <a href="https://github.com/flymop/airplay-tv/releases"><img src="https://img.shields.io/github/v/release/flymop/airplay-tv?include_prereleases&color=brightgreen&label=Auto%20Release" alt="Release" /></a>
+  </p>
+</div>
+
+<br />
+
+<p align="center">
+  <img src="docs/assets/app_banner.png" width="100%" alt="AirPlay TV Banner" />
+</p>
 
 An open-source, high-performance AirPlay receiver tailored specifically for **Android TV** and Google TV devices. Built on top of a native C/C++ RTSP/RAOP core with Google Oboe and hardware-accelerated MediaCodec video pipelines.
 

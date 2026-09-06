@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180">
+  <defs>
+    <linearGradient id="lbBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12182B"/>
+      <stop offset="50%" stop-color="#0A0E17"/>
+      <stop offset="100%" stop-color="#04060A"/>
+    </linearGradient>
+
+    <linearGradient id="lbAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="320" height="180" fill="url(#lbBg)"/>
+  <circle cx="85" cy="90" r="70" fill="#00F0FF" opacity="0.15"/>
+  <circle cx="230" cy="90" r="60" fill="#7C4DFF" opacity="0.1"/>
+
+  <g transform="translate(18, 22) scale(0.32)">
+    <path d="M244 358 L244 388 L268 388 L268 358 Z" fill="#2D374D"/>
+    <path d="M172 388 C172 384 176 382 184 382 L328 382 C336 382 340 384 340 388 L346 395 C346 398 342 400 334 400 L178 400 C170 400 166 398 166 395 Z" 
+          fill="#2D374D" stroke="#3E4E6E" stroke-width="2"/>
+
+    <rect x="54" y="70" width="404" height="288" rx="26" fill="#1C2438" stroke="#4A5C7E" stroke-width="4"/>
+    <rect x="70" y="86" width="372" height="256" rx="16" fill="#0B101E"/>
+
+    <path d="M138 238 C166 170 208 136 256 136 C304 136 346 170 374 238" 
+          fill="none" stroke="url(#lbAccent)" stroke-width="12" stroke-linecap="round" opacity="0.5"/>
+    <path d="M170 250 C192 196 222 168 256 168 C290 168 320 196 342 250" 
+          fill="none" stroke="url(#lbAccent)" stroke-width="14" stroke-linecap="round" opacity="0.85"/>
+    <path d="M202 262 C216 224 234 202 256 202 C278 202 296 224 310 262" 
+          fill="none" stroke="url(#lbAccent)" stroke-width="16" stroke-linecap="round"/>
+
+    <path d="M256 208 L320 298 C326 307 319 316 308 316 L204 316 C193 316 186 307 192 298 Z" 
+          fill="url(#lbAccent)"/>
+    <circle cx="256" cy="345" r="5" fill="#00F0FF"/>
+  </g>
+
+  <g transform="translate(148, 64)">
+    <text x="0" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="28" font-weight="900" fill="#FFFFFF" letter-spacing="-0.5">AirPlay <tspan fill="url(#lbAccent)">TV</tspan></text>
+    <text x="0" y="54" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="11.5" font-weight="600" fill="#94A3B8" letter-spacing="0.2">Android TV Receiver</text>
+    
+    <rect x="0" y="66" width="68" height="18" rx="9" fill="#162033" stroke="#2E3D59" stroke-width="1"/>
+    <text x="34" y="79" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="700" fill="#00F0FF" text-anchor="middle">4K60 CAST</text>
+  </g>
+
+  <rect x="0.5" y="0.5" width="319" height="179" fill="none" stroke="#26354D" stroke-width="1"/>
+</svg>
