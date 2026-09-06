@@ -3,6 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Platform](https://img.shields.io/badge/Platform-Android%20TV%208.0%2B-green.svg)](https://developer.android.com/tv)
 [![Architecture](https://img.shields.io/badge/Arch-arm64--v8a%20%7C%20armeabi--v7a%20%7C%20x86__64-orange.svg)](https://developer.android.com/ndk)
+[![Release](https://img.shields.io/github/v/release/flymop/airplay-tv?include_prereleases&color=brightgreen&label=Auto%20Release)](https://github.com/flymop/airplay-tv/releases)
 
 An open-source, high-performance AirPlay receiver tailored specifically for **Android TV** and Google TV devices. Built on top of a native C/C++ RTSP/RAOP core with Google Oboe and hardware-accelerated MediaCodec video pipelines.
 
@@ -129,9 +130,13 @@ For comprehensive technical deep dives, refer to the documentation in [`docs/`](
 ## 🚀 Getting Started & User Guide
 
 ### 1. Installation
-Install the APK directly onto your Android TV or Google TV using ADB:
+Download the latest production release APK from [GitHub Releases](https://github.com/flymop/airplay-tv/releases) or install via ADB:
 ```bash
-adb install -r app-debug.apk
+# Connect to your Android TV
+adb connect <TV_IP_ADDRESS>
+
+# Install the latest release APK
+adb install -r AirPlayTV-<SHORT_HASH>-release.apk
 ```
 
 ### 2. Connecting from Apple Devices
