@@ -1,4 +1,11 @@
 /*
+ * AirPlay TV - Open-source AirPlay receiver for Android TV
+ *
+ * Based on android-airplay-server by jqssun (GPLv3) and UxPlay (GPLv3).
+ * Modified and optimized by flymop (2026) for Android TV Leanback experience.
+ *
+ * Licensed under the GNU General Public License v3.0 (GPLv3).
+ *
  * Implements raop_callbacks_t by forwarding to Java/Kotlin via JNI.
  * All callbacks fire from RAOP's internal pthreads, so we AttachCurrentThread.
  */
@@ -40,8 +47,6 @@ void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject ca
     memset(ctx->registered_keys, 0, sizeof(ctx->registered_keys));
 
     pthread_mutex_init(&ctx->playback_info_lock, NULL);
-    pthread_cond_init(&ctx->play_ready_cond, NULL);
-    ctx->play_ready = 0;
     ctx->playback_position = 0.0;
     /* -1.0 is the video finished sentinel, reserved for _video_stop */
     ctx->playback_duration = 0.0;
@@ -82,7 +87,6 @@ void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env) {
         ctx->registered_keys[i] = NULL;
     }
     ctx->registered_count = 0;
-    pthread_cond_destroy(&ctx->play_ready_cond);
     pthread_mutex_destroy(&ctx->playback_info_lock);
 }
 
@@ -93,10 +97,6 @@ void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, double 
     ctx->playback_duration = duration;
     ctx->playback_rate = rate;
     ctx->playback_ready = ready;
-    if (ready && !ctx->play_ready) {
-        ctx->play_ready = 1;
-        pthread_cond_signal(&ctx->play_ready_cond);
-    }
     pthread_mutex_unlock(&ctx->playback_info_lock);
 }
 
@@ -304,25 +304,12 @@ static bool _check_register(void *cls, const char *pk_str) {
 static void _video_play(void *cls, const char *location, const float start_position) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     LOGI("video_play: %s @ %.2fs", location ? location : "(null)", start_position);
-    pthread_mutex_lock(&ctx->playback_info_lock);
-    ctx->play_ready = 0;
-    pthread_mutex_unlock(&ctx->playback_info_lock);
-    android_callbacks_update_playback_info(ctx, start_position, 0.0, 0.0f, 0);
+    android_callbacks_update_playback_info(ctx, start_position, 0.0, 1.0f, 1);
     JNIEnv *env = _get_env(ctx);
     if (!env || !location) return;
     jstring jloc = (*env)->NewStringUTF(env, location);
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_video_play, jloc, (jfloat)start_position);
     (*env)->DeleteLocalRef(env, jloc);
-    /* self-driven senders (macOS) latch their scrubber timeline at /play; hold the response
-       until the player reports ready so that read must carry the real duration */
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 10; // hold for max 10s
-    pthread_mutex_lock(&ctx->playback_info_lock);
-    while (!ctx->play_ready) {
-        if (pthread_cond_timedwait(&ctx->play_ready_cond, &ctx->playback_info_lock, &ts) == ETIMEDOUT) break;
-    }
-    pthread_mutex_unlock(&ctx->playback_info_lock);
 }
 
 static void _video_scrub(void *cls, const float position) {

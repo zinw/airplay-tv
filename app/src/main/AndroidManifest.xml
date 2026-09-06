@@ -30,7 +30,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name="io.github.jqssun.airplay.MainActivity"
+            android:name="com.flymop.airplaytv.MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:launchMode="singleTop">
@@ -42,13 +42,13 @@
         </activity>
 
         <service
-            android:name="io.github.jqssun.airplay.service.AirPlayService"
+            android:name="com.flymop.airplaytv.service.AirPlayService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|mediaPlayback" />
 
         <receiver
-            android:name="io.github.jqssun.airplay.BootReceiver"
+            android:name="com.flymop.airplaytv.BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>

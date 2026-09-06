@@ -44,10 +44,6 @@ typedef struct {
     double playback_duration;
     float playback_rate;
     int playback_ready;
-    /* holds the /play response until the player is ready, so self-driven senders (macOS)
-       establish their timeline after the real duration is known, not at duration 0 */
-    pthread_cond_t play_ready_cond;
-    int play_ready;
     AudioEngine *audio_engine;
 } android_callback_ctx_t;
 

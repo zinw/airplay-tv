@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    namespace = "com.airplay.tv"
+    namespace = "com.flymop.airplaytv"
     compileSdk = 34
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "com.airplay.tv"
+        applicationId = "com.flymop.airplaytv"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

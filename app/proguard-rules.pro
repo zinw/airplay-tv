@@ -1,2 +1,3 @@
--keep class com.airplay.tv.core.** { *; }
--keep class com.airplay.tv.native.** { *; }
+-keep class com.flymop.airplaytv.** { *; }
+-keep class com.flymop.airplaytv.bridge.** { *; }
+-keep class com.flymop.airplaytv.audio.** { *; }

@@ -335,7 +335,7 @@
     </LinearLayout>
 
     <!-- 2. Video Mirroring View Container (SurfaceView with AspectRatio) -->
-    <io.github.jqssun.airplay.video.AspectFrameLayout
+    <com.flymop.airplaytv.video.AspectFrameLayout
         android:id="@+id/videoContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -348,7 +348,7 @@
             android:layout_height="match_parent"
             android:visibility="gone" />
 
-    </io.github.jqssun.airplay.video.AspectFrameLayout>
+    </com.flymop.airplaytv.video.AspectFrameLayout>
 
     <!-- 3. HLS Web Video View Container (Media3 ExoPlayer) -->
     <androidx.media3.ui.PlayerView
@@ -356,7 +356,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
-        app:use_controller="true" />
+        app:use_controller="true"
+        app:show_buffering="when_playing"
+        app:show_timeout="4000" />
 
     <!-- 4. Audio-Only Music Player UI Container -->
     <LinearLayout
@@ -395,7 +397,7 @@
             android:textColor="@color/tv_text_secondary"
             android:textSize="20sp" />
 
-        <io.github.jqssun.airplay.ui.view.VisualizerView
+        <com.flymop.airplaytv.ui.view.VisualizerView
             android:id="@+id/visualizerView"
             android:layout_width="400dp"
             android:layout_height="80dp"
