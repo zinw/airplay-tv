@@ -108,6 +108,7 @@ AirPlay TV uses a hybrid C++/Kotlin architecture:
 
 For comprehensive technical deep dives, refer to the documentation in [`docs/`](docs/):
 - [System Architecture](docs/architecture.md)
+- [Building & Debugging Guide](docs/building_and_debugging.md)
 - [Video Rendering Pipeline](docs/video_pipeline.md)
 - [Low-Latency Audio Pipeline](docs/audio_pipeline.md)
 - [HLS Video & Network Protocol](docs/hls_and_network.md)
@@ -170,13 +171,7 @@ On the Ambient screen, select the **SETTINGS** button using the remote's **OK / 
 
 ## 🛠️ Building from Source
 
-### Prerequisites
-- **Android Studio** Ladybug (2024.2+) or newer
-- **Android SDK & NDK**: `27.0.12077973`
-- **CMake**: `3.22.1+`
-- **Git** with submodule support
-
-### Build Steps
+### Quick Build
 ```bash
 # 1. Clone the repository with submodules
 git clone --recursive https://github.com/flymop/airplay-tv.git
@@ -189,6 +184,8 @@ cd airplay-tv
 adb connect <TV_IP_ADDRESS>:<PORT>
 ./gradlew installDebug
 ```
+
+For full details on Wireless ADB setup, logcat filtering, Performance HUD diagnostics, and NDK toolchains, see the **[Building & Debugging Guide](docs/building_and_debugging.md)**.
 
 ---
 
