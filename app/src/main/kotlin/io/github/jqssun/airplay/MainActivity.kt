@@ -15,10 +15,13 @@ import android.view.KeyEvent
 import android.view.SurfaceHolder
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.airplay.tv.R
 import com.airplay.tv.databinding.ActivityMainBinding
+import io.github.jqssun.airplay.Prefs
 import io.github.jqssun.airplay.service.AirPlayService
 import io.github.jqssun.airplay.service.AirPlayService.ServerState
 import kotlinx.coroutines.flow.collectLatest
@@ -71,8 +74,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         setContentView(binding.root)
 
         binding.hudOverlay.visibility = View.GONE
+        binding.settingsOverlay.visibility = View.GONE
         setupSurfaceView()
-        setupButtons()
+        setupSettings()
         startAndBindService()
     }
 
@@ -80,10 +84,122 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.surfaceView.holder.addCallback(this)
     }
 
-    private fun setupButtons() {
+    private fun setupSettings() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+
+        // Populate initial values
+        val currentName = prefs.getString(Prefs.SERVER_NAME, Prefs.DEF_SERVER_NAME) ?: Prefs.DEF_SERVER_NAME
+        binding.tvSettingDeviceNameVal.text = currentName
+        binding.switchHud.isChecked = isHudVisible
+        binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
+        binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
+        binding.switchPin.isChecked = prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
+        binding.tvSettingResolutionVal.text = prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION
+        binding.tvSettingMaxFpsVal.text = "${prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)} FPS"
+
+        // Open settings button on main screen
         binding.btnSettings.setOnClickListener {
-            toggleHud()
+            openSettings()
         }
+
+        // Close button inside settings
+        binding.btnCloseSettings.setOnClickListener {
+            closeSettings()
+        }
+
+        // Row: Device Name
+        binding.rowSettingDeviceName.setOnClickListener {
+            showEditDeviceNameDialog()
+        }
+
+        // Row: HUD Overlay
+        binding.rowSettingHud.setOnClickListener {
+            val newState = !binding.switchHud.isChecked
+            binding.switchHud.isChecked = newState
+            if (isHudVisible != newState) {
+                toggleHud()
+            }
+        }
+
+        // Row: Low-Latency Audio
+        binding.rowSettingLowLatency.setOnClickListener {
+            val newState = !binding.switchLowLatency.isChecked
+            binding.switchLowLatency.isChecked = newState
+            prefs.edit().putBoolean(Prefs.LOW_LATENCY, newState).apply()
+        }
+
+        // Row: H.265 Hardware Video
+        binding.rowSettingH265.setOnClickListener {
+            val newState = !binding.switchH265.isChecked
+            binding.switchH265.isChecked = newState
+            prefs.edit().putBoolean(Prefs.H265_ENABLED, newState).apply()
+        }
+
+        // Row: Resolution
+        val resOptions = listOf(Prefs.AUTO, "1920x1080", "1280x720", "3840x2160")
+        binding.rowSettingResolution.setOnClickListener {
+            val currentRes = prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION
+            val nextIdx = (resOptions.indexOf(currentRes) + 1).let { if (it >= resOptions.size || it < 0) 0 else it }
+            val newRes = resOptions[nextIdx]
+            prefs.edit().putString(Prefs.RESOLUTION, newRes).apply()
+            binding.tvSettingResolutionVal.text = newRes
+        }
+
+        // Row: Max FPS
+        val fpsOptions = listOf(60, 30, 120)
+        binding.rowSettingMaxFps.setOnClickListener {
+            val currentFps = prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)
+            val nextIdx = (fpsOptions.indexOf(currentFps) + 1).let { if (it >= fpsOptions.size || it < 0) 0 else it }
+            val newFps = fpsOptions[nextIdx]
+            prefs.edit().putInt(Prefs.MAX_FPS, newFps).apply()
+            binding.tvSettingMaxFpsVal.text = "$newFps FPS"
+        }
+
+        // Row: PIN Security
+        binding.rowSettingPin.setOnClickListener {
+            val newState = !binding.switchPin.isChecked
+            binding.switchPin.isChecked = newState
+            prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
+        }
+    }
+
+    private fun openSettings() {
+        binding.settingsOverlay.visibility = View.VISIBLE
+        binding.rowSettingDeviceName.requestFocus()
+    }
+
+    private fun closeSettings() {
+        binding.settingsOverlay.visibility = View.GONE
+        binding.btnSettings.requestFocus()
+    }
+
+    private fun showEditDeviceNameDialog() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val currentName = prefs.getString(Prefs.SERVER_NAME, Prefs.DEF_SERVER_NAME) ?: Prefs.DEF_SERVER_NAME
+
+        val input = EditText(this).apply {
+            setText(currentName)
+            selectAll()
+            setTextColor(resources.getColor(R.color.white, theme))
+            setPadding(48, 24, 48, 24)
+        }
+
+        AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
+            .setTitle("Edit Device Name")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isNotEmpty()) {
+                    prefs.edit().putString(Prefs.SERVER_NAME, newName).apply()
+                    binding.tvSettingDeviceNameVal.text = newName
+                    airPlayService?.let {
+                        it.startServer(newName)
+                        updateServerInfo(it)
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun startAndBindService() {
@@ -267,6 +383,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun toggleHud() {
         isHudVisible = !isHudVisible
         binding.hudOverlay.visibility = if (isHudVisible) View.VISIBLE else View.GONE
+        binding.switchHud.isChecked = isHudVisible
         if (isHudVisible) {
             mainHandler.removeCallbacks(hudUpdateRunnable)
             mainHandler.post(hudUpdateRunnable)
@@ -305,12 +422,24 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val service = airPlayService
+        val isSettingsOpen = binding.settingsOverlay.visibility == View.VISIBLE
+        val isAmbientOpen = binding.ambientContainer.visibility == View.VISIBLE
+
         when (keyCode) {
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_DPAD_UP -> {
-                toggleHud()
-                return true
+            // Directional keys: DO NOT INTERCEPT, let Android TV focus engine navigate between views
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                return super.onKeyDown(keyCode, event)
             }
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+
+            // Center / Enter: When UI views (like Settings) are visible, let standard click event fire
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                if (isSettingsOpen || isAmbientOpen) {
+                    return super.onKeyDown(keyCode, event)
+                }
+                // During active media playback without UI open, act as play/pause
                 if (service?.playing?.value == true) {
                     service?.dacpPlayer?.pause()
                 } else {
@@ -318,15 +447,36 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 }
                 return true
             }
+
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                if (service?.playing?.value == true) {
+                    service?.dacpPlayer?.pause()
+                } else {
+                    service?.dacpPlayer?.play()
+                }
+                return true
+            }
+
             KeyEvent.KEYCODE_MEDIA_NEXT -> {
                 service?.dacpController?.nextItem()
                 return true
             }
+
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                 service?.dacpController?.prevItem()
                 return true
             }
+
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_PROG_BLUE -> {
+                toggleHud()
+                return true
+            }
+
             KeyEvent.KEYCODE_BACK -> {
+                if (isSettingsOpen) {
+                    closeSettings()
+                    return true
+                }
                 if (isHudVisible) {
                     toggleHud()
                     return true
