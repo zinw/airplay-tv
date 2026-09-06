@@ -13,3 +13,4 @@ app/.cxx/
 *.aab
 build/
 .vscode/
+screenshot*.png

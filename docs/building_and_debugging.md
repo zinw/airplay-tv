@@ -60,7 +60,11 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`
 ```bash
 ./gradlew assembleRelease
 ```
-Output: `app/build/outputs/apk/release/app-release.apk`
+Outputs (generated in `app/build/outputs/apk/release/`):
+- `app-armeabi-v7a-release.apk`: Lightweight build for 32-bit ARM TVs & TV sticks (~13 MB)
+- `app-arm64-v8a-release.apk`: Lightweight build for 64-bit ARM TVs & Shields (~17 MB)
+- `app-x86_64-release.apk`: Build for x86_64 Android TV / Emulators (~17 MB)
+- `app-universal-release.apk`: Universal all-in-one APK containing all ABIs (~30 MB)
 
 ### Architecture & ABI Targets
 AirPlay TV builds native `.so` binaries for:
@@ -120,8 +124,8 @@ adb devices
 # Install Debug APK
 ./gradlew installDebug
 
-# Or Install Release APK
-adb install -r app/build/outputs/apk/release/app-release.apk
+# Or Install Release APK (e.g. armeabi-v7a or arm64-v8a)
+adb install -r app/build/outputs/apk/release/app-armeabi-v7a-release.apk
 
 # Launch AirPlay TV activity
 adb shell am start -n com.flymop.airplaytv/.MainActivity

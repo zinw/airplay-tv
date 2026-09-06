@@ -164,22 +164,29 @@ class VideoRenderer(ctx: Context) {
     }
 
     private fun _isKeyframe(data: ByteArray, isH265: Boolean): Boolean {
-        if (data.size < 5) return false
-        val limit = minOf(data.size - 5, 4096)
+        if (data.size < 4) return false
+        val limit = minOf(data.size - 4, 8192)
         var i = 0
         while (i <= limit) {
-            if (data[i] == 0.toByte() && data[i + 1] == 0.toByte() &&
-                data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte()) {
-                val key = if (isH265) {
-                    val type = (data[i + 4].toInt() shr 1) and 0x3F
-                    type == 19 || type == 20 || type == 21 || type == 32 || type == 33
-                } else {
-                    val type = data[i + 4].toInt() and 0x1F
-                    type == 5 || type == 7
+            val is4Byte = i + 4 <= data.size && data[i] == 0.toByte() && data[i + 1] == 0.toByte() && data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte()
+            val is3Byte = !is4Byte && i + 3 <= data.size && data[i] == 0.toByte() && data[i + 1] == 0.toByte() && data[i + 2] == 1.toByte()
+
+            if (is4Byte || is3Byte) {
+                val headerOffset = if (is4Byte) i + 4 else i + 3
+                if (headerOffset < data.size) {
+                    val key = if (isH265) {
+                        val type = (data[headerOffset].toInt() shr 1) and 0x3F
+                        type in 19..21 || type == 32 || type == 33
+                    } else {
+                        val type = data[headerOffset].toInt() and 0x1F
+                        type == 5 || type == 7
+                    }
+                    if (key) return true
                 }
-                if (key) return true
+                i += if (is4Byte) 4 else 3
+            } else {
+                i++
             }
-            i++
         }
         return false
     }

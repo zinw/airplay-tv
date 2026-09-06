@@ -342,11 +342,24 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
 
         lifecycleScope.launch {
+            service.audioOnly.collectLatest {
+                runOnUiThread {
+                    updateViewVisibility()
+                }
+            }
+        }
+
+        lifecycleScope.launch {
             service.trackInfo.collectLatest { track ->
                 runOnUiThread {
                     updateViewVisibility()
-                    binding.tvTrackTitle.text = track.title.ifBlank { getString(R.string.unknown_track) }
-                    binding.tvTrackArtist.text = listOfNotNull(track.artist.takeIf { it.isNotBlank() }, track.album.takeIf { it.isNotBlank() }).joinToString(" - ")
+                    if (track.title.isNotBlank()) {
+                        binding.tvTrackTitle.text = track.title
+                        binding.tvTrackArtist.text = listOfNotNull(track.artist.takeIf { it.isNotBlank() }, track.album.takeIf { it.isNotBlank() }).joinToString(" - ")
+                    } else {
+                        binding.tvTrackTitle.text = getString(R.string.airplay_audio_title)
+                        binding.tvTrackArtist.text = getString(R.string.airplay_audio_subtitle)
+                    }
                 }
             }
         }
@@ -369,7 +382,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val service = airPlayService ?: return
         val isMirroring = service.mirrorRunning.value
         val hasHlsVideo = service.videoLocation.value != null
-        val hasMusic = service.trackInfo.value.title.isNotBlank() && !isMirroring && !hasHlsVideo
+        val hasMusic = (service.audioOnly.value || service.trackInfo.value.title.isNotBlank()) && !isMirroring && !hasHlsVideo
 
         when {
             hasHlsVideo -> {
@@ -395,6 +408,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 binding.surfaceView.visibility = View.GONE
                 binding.musicContainer.visibility = View.VISIBLE
                 binding.visualizerView.setPlaying(true)
+                if (service.trackInfo.value.title.isBlank()) {
+                    binding.tvTrackTitle.text = getString(R.string.airplay_audio_title)
+                    binding.tvTrackArtist.text = getString(R.string.airplay_audio_subtitle)
+                }
             }
             else -> {
                 binding.hlsPlayerView.visibility = View.GONE
@@ -456,7 +473,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val isAmbientOpen = binding.ambientContainer.visibility == View.VISIBLE
         val isMirroring = service?.mirrorRunning?.value == true
         val hasHlsVideo = service?.videoLocation?.value != null
-        val hasMusic = service?.trackInfo?.value?.title?.isNotBlank() == true && !isMirroring && !hasHlsVideo
+        val hasMusic = (service?.audioOnly?.value == true || service?.trackInfo?.value?.title?.isNotBlank() == true) && !isMirroring && !hasHlsVideo
         val isHlsControllerVisible = hasHlsVideo && binding.hlsPlayerView.isControllerFullyVisible
 
         when (keyCode) {

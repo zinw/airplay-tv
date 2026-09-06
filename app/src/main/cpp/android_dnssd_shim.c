@@ -161,7 +161,7 @@ dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
         _txt_set(rec, "pw", "false");
         break;
     }
-    _txt_set(rec, "flags", "0x4");
+    _txt_set(rec, "flags", AIRPLAY_FLAGS);
     _txt_set(rec, "model", GLOBAL_MODEL);
     if (dnssd->pk) {
         _txt_set(rec, "pk", dnssd->pk);

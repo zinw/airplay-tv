@@ -27,6 +27,8 @@
 
     <!-- Music & Media -->
     <string name="unknown_track">Unknown Track</string>
+    <string name="airplay_audio_title">AirPlay Audio</string>
+    <string name="airplay_audio_subtitle">Connected Device • Streaming</string>
     <string name="download_saved">Saved to %1$s</string>
     <string name="download_failed">Download failed</string>
 </resources>

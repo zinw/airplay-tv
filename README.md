@@ -113,6 +113,7 @@ For comprehensive technical deep dives, refer to the documentation in [`docs/`](
 - [Low-Latency Audio Pipeline](docs/audio_pipeline.md)
 - [HLS Video & Network Protocol](docs/hls_and_network.md)
 - [Android TV UI & Remote Control UX](docs/tv_ui_and_remote.md)
+- [AI Agent Context & System Prompt](docs/PROMPT.md)
 
 ---
 

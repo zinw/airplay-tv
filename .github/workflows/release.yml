@@ -55,9 +55,15 @@ jobs:
         run: |
           mkdir -p release-artifacts
           SHORT_SHA="${{ steps.meta.outputs.short_sha }}"
-          cp app/build/outputs/apk/release/app-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-release.apk"
+          
+          # Copy Universal & ABI-specific APKs
+          cp app/build/outputs/apk/release/app-universal-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-universal.apk"
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-armeabi-v7a.apk"
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-arm64-v8a.apk"
+          cp app/build/outputs/apk/release/app-x86_64-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-x86_64.apk"
+          
           cd release-artifacts
-          sha256sum "AirPlayTV-${SHORT_SHA}-release.apk" > "AirPlayTV-${SHORT_SHA}-release.apk.sha256"
+          sha256sum *.apk > SHA256SUMS.txt
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
@@ -73,16 +79,20 @@ jobs:
             **Commit:** [`${{ steps.meta.outputs.short_sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
             
             #### 📦 Included Artifacts
-            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-release.apk`: Signed production-ready APK with all ABI architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`)
-            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-release.apk.sha256`: SHA-256 Checksum
+            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-armeabi-v7a.apk`: Lightweight build for 32-bit ARM TVs / TV sticks (~13 MB)
+            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-arm64-v8a.apk`: Lightweight build for 64-bit ARM TVs / Shields (~17 MB)
+            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-x86_64.apk`: Build for x86_64 Android TV / Emulators (~17 MB)
+            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-universal.apk`: All-in-one APK containing all ABIs (~30 MB)
+            - `SHA256SUMS.txt`: SHA-256 Checksums for all binaries
             
             #### 🚀 Quick Install via ADB
             ```bash
             adb connect <YOUR_ANDROID_TV_IP>
-            adb install -r AirPlayTV-${{ steps.meta.outputs.short_sha }}-release.apk
+            # For 32-bit Chromecast with Google TV / Fire TV / Mi Box:
+            adb install -r AirPlayTV-${{ steps.meta.outputs.short_sha }}-armeabi-v7a.apk
             ```
           files: |
-            release-artifacts/AirPlayTV-${{ steps.meta.outputs.short_sha }}-release.apk
-            release-artifacts/AirPlayTV-${{ steps.meta.outputs.short_sha }}-release.apk.sha256
+            release-artifacts/*.apk
+            release-artifacts/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
