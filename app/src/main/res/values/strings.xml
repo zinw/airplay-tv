@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">AirPlay TV</string>
+    <string name="ready_to_connect">Ready to Connect</string>
+    <string name="connect_instruction">Select this device in Screen Mirroring or AirPlay on your iPhone, iPad, or Mac.</string>
+    <string name="server_name_label">Device Name:</string>
+    <string name="ip_address_label">IP Address:</string>
+    <string name="port_label">Port:</string>
+    <string name="connected_device">Connected:</string>
+    <string name="pin_code_title">AirPlay Security PIN</string>
+    <string name="settings_title">Settings</string>
+    <string name="low_latency">Low Latency Mode</string>
+    <string name="show_hud">Show Performance HUD</string>
+
+    <!-- Notification -->
+    <string name="notification_channel">AirPlay Service</string>
+    <string name="notification_title">AirPlay TV Running</string>
+    <string name="notification_text">Accepting AirPlay connections</string>
+    <string name="notification_pin_title">AirPlay PIN Required</string>
+    <string name="notification_pin_text">PIN: %1$s</string>
+    <string name="stop_service">Stop</string>
+
+    <!-- Music & Media -->
+    <string name="unknown_track">Unknown Track</string>
+    <string name="download_saved">Saved to %1$s</string>
+    <string name="download_failed">Download failed</string>
+</resources>

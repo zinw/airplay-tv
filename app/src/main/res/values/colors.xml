@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="tv_bg_dark">#0F111A</color>
+    <color name="tv_card_bg">#1E2235</color>
+    <color name="tv_accent">#00E5FF</color>
+    <color name="tv_accent_secondary">#7C4DFF</color>
+    <color name="tv_text_primary">#FFFFFF</color>
+    <color name="tv_text_secondary">#9E9E9E</color>
+    <color name="hud_bg">#B3000000</color>
+    <color name="pin_code_bg">#2A2E43</color>
+</resources>

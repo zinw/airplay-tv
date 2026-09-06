@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.AirPlayTV" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@color/tv_bg_dark</item>
+        <item name="colorPrimary">@color/tv_accent</item>
+        <item name="colorAccent">@color/tv_accent</item>
+    </style>
+</resources>

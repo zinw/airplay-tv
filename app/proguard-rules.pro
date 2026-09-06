@@ -1,0 +1,2 @@
+-keep class com.airplay.tv.core.** { *; }
+-keep class com.airplay.tv.native.** { *; }
