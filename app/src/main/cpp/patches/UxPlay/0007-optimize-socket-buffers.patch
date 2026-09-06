@@ -1,0 +1,19 @@
+diff --git a/lib/netutils.c b/lib/netutils.c
+index 58ea3e3..7b12d5e 100644
+--- a/lib/netutils.c
++++ b/lib/netutils.c
+@@ -134,6 +134,14 @@ netutils_init_socket(unsigned short *port, int use_ipv6, int use_udp)
+         goto cleanup;
+     }
+ 
++    /* Optimize socket receive buffer size for high-bitrate video/audio streaming */
++    int rcvbuf = 2 * 1024 * 1024;
++    setsockopt(server_fd, SOL_SOCKET, SO_RCVBUF, (const char *)&rcvbuf, sizeof(rcvbuf));
++    if (!use_udp) {
++        int nodelay = 1;
++        setsockopt(server_fd, IPPROTO_TCP, TCP_NODELAY, (const char *)&nodelay, sizeof(nodelay));
++    }
++
+ #if defined(__APPLE__) && defined(UXPLAY_HAVE_APPLE_P2P)
+     if (peer_to_peer) {
+         int recv_any_if = 1;

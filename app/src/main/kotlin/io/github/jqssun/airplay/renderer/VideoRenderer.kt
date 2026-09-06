@@ -165,8 +165,9 @@ class VideoRenderer(ctx: Context) {
 
     private fun _isKeyframe(data: ByteArray, isH265: Boolean): Boolean {
         if (data.size < 5) return false
+        val limit = minOf(data.size - 5, 4096)
         var i = 0
-        while (i <= data.size - 5) {
+        while (i <= limit) {
             if (data[i] == 0.toByte() && data[i + 1] == 0.toByte() &&
                 data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte()) {
                 val key = if (isH265) {

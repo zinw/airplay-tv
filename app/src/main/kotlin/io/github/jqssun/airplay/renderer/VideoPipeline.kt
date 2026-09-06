@@ -30,6 +30,8 @@ class VideoPipeline {
     private var aPos = 0
     private var aTex = 0
     private var uTexMatrix = 0
+    private var posVbo = 0
+    private var texVbo = 0
     private val texMatrix = FloatArray(16)
     private var hasFrame = false
 
@@ -72,6 +74,7 @@ class VideoPipeline {
     }
 
     private fun _loop() {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_DISPLAY)
         try {
             egl = EglCore()
             _initGl()
@@ -147,16 +150,22 @@ class VideoPipeline {
 
     private fun _render() {
         GLES20.glViewport(0, 0, winW, winH)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTex)
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, posVbo)
         GLES20.glEnableVertexAttribArray(aPos)
-        GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, 0, POS)
+        GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, 0, 0)
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, texVbo)
         GLES20.glEnableVertexAttribArray(aTex)
-        GLES20.glVertexAttribPointer(aTex, 2, GLES20.GL_FLOAT, false, 0, TEX)
+        GLES20.glVertexAttribPointer(aTex, 2, GLES20.GL_FLOAT, false, 0, 0)
+
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         GLES20.glDisableVertexAttribArray(aPos)
         GLES20.glDisableVertexAttribArray(aTex)
         egl?.swap(window)
@@ -167,6 +176,19 @@ class VideoPipeline {
         aPos = GLES20.glGetAttribLocation(program, "aPos")
         aTex = GLES20.glGetAttribLocation(program, "aTex")
         uTexMatrix = GLES20.glGetUniformLocation(program, "uTexMatrix")
+
+        val vbos = IntArray(2)
+        GLES20.glGenBuffers(2, vbos, 0)
+        posVbo = vbos[0]
+        texVbo = vbos[1]
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, posVbo)
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, POS.capacity() * 4, POS, GLES20.GL_STATIC_DRAW)
+
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, texVbo)
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, TEX.capacity() * 4, TEX, GLES20.GL_STATIC_DRAW)
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+
         val tex = IntArray(1)
         GLES20.glGenTextures(1, tex, 0)
         oesTex = tex[0]
@@ -210,6 +232,11 @@ class VideoPipeline {
         surfaceTexture = null
         inputSurface?.release()
         inputSurface = null
+        if (posVbo != 0 || texVbo != 0) {
+            GLES20.glDeleteBuffers(2, intArrayOf(posVbo, texVbo), 0)
+            posVbo = 0
+            texVbo = 0
+        }
         egl?.let {
             if (window != EGL14.EGL_NO_SURFACE) it.destroySurface(window)
             it.close()
