@@ -52,7 +52,25 @@ AirPlay RTP packets transmit timestamps (NTP/RTP). Network jitter can cause pack
 
 ---
 
-## 3. Volume & DACP Control
+## 3. ALAC Silence Frames, Endianness & Clock Drift
+
+### ALAC Silence Frames & Compression
+* **44-Byte Frame Structure**: When an iOS sender is paused or audio is muted, it continuously transmits 44-byte RTP packets containing a 32-byte compressed ALAC silence payload.
+* **Continuous Dequeuing**: Filtering or skipping 44-byte frames breaks packet sequence number continuity in `raop_buffer.c`, causing the dequeue thread to wait for missing packet retransmissions and freezing audio. AirPlay TV processes all 44-byte silence frames to keep the timeline perfectly synced.
+
+### Endianness on ARM Architectures
+Apple Lossless encodes header metadata in Big-Endian format. In `EndianPortable.c`, defining `TARGET_RT_LITTLE_ENDIAN` for ARM/ARM64 targets is critical:
+* Without explicit endianness flags, `ALACSpecificConfig` fields (`maxFrameBytes`, `avgBitRate`) are byte-swapped incorrectly, resulting in multi-gigabyte memory allocation failures (`calloc(2147745792)`).
+
+### Clock Drift Compensation & Timeline Synchronization
+Because the sender's crystal clock (iPhone) and receiver's hardware DAC clock (Android TV) drift slightly over time:
+1. **Timestamp Anchoring**: The server maps RTP packet timestamps to local monotonic audio time.
+2. **Percentile Delay Tracking**: `TimelineBuffer.cpp` tracks packet arrival times using an 80th-to-99th percentile statistical window.
+3. **Dynamic Frame Trimming & Silence Injection**: If the buffer runs ahead due to sender drift, sub-sample frames are smoothly trimmed; if it falls behind, micro-silence frames are injected. This prevents audible clicks or cumulative delay drift over hours of continuous streaming.
+
+---
+
+## 4. Volume & DACP Control
 
 * **AirPlay Decibel Curve**: AirPlay sends volume in decibels from `-144.0 dB` (mute) to `0.0 dB` (max).
 * **Linear Android Conversion**:

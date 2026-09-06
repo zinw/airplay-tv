@@ -7,10 +7,10 @@
 ## 1. 10-Foot UI Architecture
 
 * **Ambient "Ready to Connect" Screen**:
-  * High-contrast, dark-mode gradient background (`#0D1117` to `#161B22`) designed for OLED and LED TVs.
+  * High-contrast, dark-mode gradient background (`#0B0E17` to `#161B22`) designed for OLED and LED TVs.
   * Live status capsule displaying Bonjour/mDNS broadcast status and dynamically bound port.
   * 3-step visual connection guide with large, readable typography and modern iconography.
-  * "Settings" action button with prominent focused border states (`bg_button_focusable.xml`).
+  * "Settings" action button with high-contrast text color selector (`btn_text_focusable.xml`).
 
 * **Now Playing Music Screen**:
   * High-resolution album artwork display with rounded corners and subtle shadow borders.
@@ -23,9 +23,26 @@
 
 ---
 
-## 2. Remote Control Key Mapping Logic
+## 2. Remote Control Architecture & Apple TV UX Rationale
 
-The remote controller operates in a **hybrid navigation model**: Android TV standard for menus, and Apple TV standard during active streaming.
+### Hybrid Remote UX Model
+Standard Android TV applications rely on linear focus traversal between on-screen views. However, during active AirPlay streaming, users expect the behavior of an **Apple TV**:
+
+1. **Ambient & Settings Menus**: Follows standard Android TV Leanback focus mechanics (D-Pad navigates between buttons/cards; Center/OK activates).
+2. **Active Screen Mirroring**: Direct interaction model. Pressing `BACK` triggers immediate session teardown rather than navigating UI focus.
+3. **HLS Web Video**: Two-tier navigation. Directional keys seek directly when controls are hidden; Up/Down reveals full on-screen controls (OSD); `BACK` dismisses OSD first before interrupting playback.
+
+### Immediate Session Teardown (`nativeDisconnectSessions`)
+In standard receivers, pressing `BACK` on Android TV merely minimizes the Activity while the native RTSP/RTP server continues receiving and decoding 20+ Mbps video in the background until the iOS sender disconnects.
+
+In **AirPlay TV**:
+* Pressing `BACK` during active mirroring invokes `NativeBridge.nativeDisconnectSessions(nativeHandle)`.
+* The native C core immediately terminates the RTSP socket connection and sends a teardown notification to the iOS client.
+* Frees all GPU surfaces, decoder buffers, and network resources instantly.
+
+---
+
+## 3. Remote Control Key Mapping Matrix
 
 ```
 +---------------------------------------------------------------------------------------------------------+
@@ -39,7 +56,7 @@ The remote controller operates in a **hybrid navigation model**: Android TV stan
 |                      | Center / Enter / OK   | Toggles switch or opens edit dialog                      |
 |                      | Back / Return         | Closes Settings overlay, returns focus to main screen    |
 +----------------------+-----------------------+----------------------------------------------------------+
-| Screen Mirroring     | Back / Return         | Instantly disconnects AirPlay mirroring session & returns|
+| Screen Mirroring     | Back / Return         | Invokes nativeDisconnectSessions; instantly disconnects  |
 |                      | Center / Play-Pause   | Sends DACP Play/Pause to iOS device                      |
 |                      | Menu / Info / Blue    | Toggles Performance HUD                                  |
 +----------------------+-----------------------+----------------------------------------------------------+

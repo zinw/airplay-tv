@@ -70,7 +70,31 @@ AirPlay TV builds native `.so` binaries for:
 
 ---
 
-## 📺 4. Remote Wireless Debugging on Android TV
+## 🚀 4. Automated CI/CD Release Pipeline
+
+AirPlay TV includes an automated GitHub Actions workflow (`.github/workflows/release.yml`) configured for continuous release delivery:
+
+```
+[git push to main / master]
+             │
+             ├── 1. Checkout repository with all submodules recursively
+             ├── 2. Provision JDK 17 (Temurin) & Gradle cache
+             ├── 3. Install NDK 27.0.12077973 & CMake 3.22.1 via sdkmanager
+             ├── 4. Extract 8-character commit hash version (v<SHORT_SHA>)
+             ├── 5. Build production release APK (./gradlew assembleRelease)
+             ├── 6. Generate SHA-256 checksums
+             └── 7. Create GitHub Release & publish APK assets via softprops/action-gh-release
+```
+
+### Release Versioning
+- Releases are tagged using the 8-character commit hash (e.g. `vd89e2860`).
+- Artifacts:
+  - `AirPlayTV-<SHORT_SHA>-release.apk` (Signed production APK for all ABIs)
+  - `AirPlayTV-<SHORT_SHA>-release.apk.sha256` (SHA-256 verification checksum)
+
+---
+
+## 📺 5. Remote Wireless Debugging on Android TV
 
 Android TV devices typically do not have direct USB connections available. Wireless ADB debugging is the standard workflow.
 
@@ -105,7 +129,7 @@ adb shell am start -n com.flymop.airplaytv/.MainActivity
 
 ---
 
-## 🔍 5. Live Logcat Debugging
+## 🔍 6. Live Logcat Debugging
 
 Filter Android logcat streams by subsystem:
 
@@ -135,7 +159,7 @@ adb logcat -v time -s AirPlayService NsdServiceManager
 
 ---
 
-## 📊 6. In-App Performance HUD
+## 📊 7. In-App Performance HUD
 
 AirPlay TV includes a built-in real-time diagnostics overlay (Performance HUD).
 
@@ -153,7 +177,7 @@ AirPlay TV includes a built-in real-time diagnostics overlay (Performance HUD).
 
 ---
 
-## 🚨 7. Common Troubleshooting
+## 🚨 8. Common Troubleshooting
 
 | Issue | Root Cause | Solution |
 | :--- | :--- | :--- |
