@@ -5,7 +5,13 @@
     <string name="server_name_label">Device Name:</string>
     <string name="ip_address_label">IP Address:</string>
     <string name="port_label">Port:</string>
-    <string name="connected_device">Connected:</string>
+    <string name="step_1_title">Same Wi-Fi Network</string>
+    <string name="step_1_desc">Connect iPhone, iPad, or Mac to the same network</string>
+    <string name="step_2_title">Open Control Center</string>
+    <string name="step_2_desc">Tap Screen Mirroring or the AirPlay audio icon</string>
+    <string name="step_3_title">Select TV Device</string>
+    <string name="step_3_desc">Choose this device to start streaming instantly</string>
+    <string name="status_broadcasting">Ready to Cast • Bonjour Active</string>
     <string name="pin_code_title">AirPlay Security PIN</string>
     <string name="settings_title">Settings</string>
     <string name="low_latency">Low Latency Mode</string>

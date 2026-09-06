@@ -21,7 +21,6 @@ import com.airplay.tv.R
 import com.airplay.tv.databinding.ActivityMainBinding
 import io.github.jqssun.airplay.service.AirPlayService
 import io.github.jqssun.airplay.service.AirPlayService.ServerState
-import io.github.jqssun.airplay.utils.QrCodeGenerator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
@@ -106,11 +105,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         val ip = getLocalIpAddress() ?: "127.0.0.1"
         binding.tvIpAddress.text = "$ip:$port"
-
-        // Generate QR Code for connection guide
-        val qrContent = "airplay://$serverName@$ip:$port"
-        val qrBitmap = QrCodeGenerator.generateQrBitmap(qrContent, 220, 220)
-        qrBitmap?.let { binding.ivQrCode.setImageBitmap(it) }
     }
 
     private fun onServiceBound() {
