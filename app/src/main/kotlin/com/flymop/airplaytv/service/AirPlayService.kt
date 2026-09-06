@@ -53,7 +53,6 @@ import com.flymop.airplaytv.bridge.LogListener
 import com.flymop.airplaytv.bridge.NativeBridge
 import com.flymop.airplaytv.bridge.RaopCallbackHandler
 import com.flymop.airplaytv.discovery.NsdServiceManager
-import com.flymop.airplaytv.download.VideoDownloader
 import com.flymop.airplaytv.renderer.AirPlayVideoPlayer
 import com.flymop.airplaytv.renderer.AudioRenderer
 import com.flymop.airplaytv.renderer.VideoRenderer
@@ -88,7 +87,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     val audioRenderer = AudioRenderer()
     private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val airPlayVideoPlayer by lazy { AirPlayVideoPlayer(this) }
-    val videoDownloader by lazy { VideoDownloader(this) }
 
     // hls urls point at the native httpd, valid only while the session lives
     private val _videoLocation = MutableStateFlow<String?>(null)
@@ -619,10 +617,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _durationMs.value = 0
         _updateMediaNotification()
         mediaSession?.isActive = false
-    }
-
-    fun downloadVideo() {
-        _videoLocation.value?.let { videoDownloader.start(it) }
     }
 
     private fun _endVideoPlayback(message: String) {
