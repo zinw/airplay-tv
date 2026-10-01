@@ -4,14 +4,20 @@ import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
 import com.flymop.airplaytv.renderer.DecoderSelector.Companion.videoCaps
 import java.nio.ByteBuffer
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class VideoRenderer(ctx: Context) {
 
     private val lock = Object()
+    private val ptsLock = Object()
     private val pipeline = VideoPipeline()
     val selector = DecoderSelector(ctx)
     private var avcDecoder: MediaCodecInfo? = null
@@ -23,6 +29,14 @@ class VideoRenderer(ctx: Context) {
     private var videoWidth = 0
     private var videoHeight = 0
     private var firstFrameQueued = false
+    /** After flush/start, discard non-keyframes until the next IDR/SPS arrives. */
+    private var awaitingKeyframe = true
+    private var consecutiveCodecErrors = 0
+
+    private val codecThread = HandlerThread("video-codec").also { it.start() }
+    private val codecHandler = Handler(codecThread.looper)
+    private val freeInputs = ArrayBlockingQueue<Int>(64)
+    private val codecAlive = AtomicBoolean(false)
 
     /**
      * Direct scratch filled by native `_video_process` before [feedFrame] runs.
@@ -91,12 +105,56 @@ class VideoRenderer(ctx: Context) {
             .reduceOrNull { (w1, h1), (w2, h2) -> maxOf(w1, w2) to maxOf(h1, h2) } ?: (1920 to 1080)
 
     // codec per mirror session; pipeline persists across sessions
-    fun startSession() = synchronized(lock) { _resetStats() }
+    fun startSession() = synchronized(lock) {
+        _resetStats()
+        // Pre-create AVC decoder so the first IDR does not pay create+configure on the RTP thread.
+        if (codec == null && videoWidth > 0 && videoHeight > 0 && avcDecoder != null) {
+            try {
+                startCodec(h265 = false)
+                awaitingKeyframe = true
+                Log.i(TAG, "prewarmed AVC codec ahead of first keyframe")
+            } catch (e: Exception) {
+                Log.w(TAG, "codec prewarm failed (will start on first keyframe)", e)
+                stopCodec()
+            }
+        }
+    }
 
     fun stopSession() = synchronized(lock) { stopCodec() }
 
-    /** RAOP video_flush / discontinuity: drop codec state and wait for the next keyframe. */
-    fun flushSession() = synchronized(lock) { stopCodec() }
+    /**
+     * RAOP video_flush / discontinuity: soft-flush codec state and wait for the next keyframe.
+     * Avoids full stop/release (hundreds of ms) on pause/resume and track-like resets.
+     * Hard-restarts only after repeated decode errors.
+     */
+    fun flushSession() = synchronized(lock) {
+        val c = codec
+        if (c == null) {
+            awaitingKeyframe = true
+            firstFrameQueued = false
+            return@synchronized
+        }
+        try {
+            freeInputs.clear()
+            c.flush()
+            // After flush(), Callback re-offers input buffers; clear any stale pre-flush indices.
+            freeInputs.clear()
+            firstFrameQueued = false
+            awaitingKeyframe = true
+            consecutiveCodecErrors = 0
+            synchronized(ptsLock) {
+                _ptsBaseUs = Long.MIN_VALUE
+                _wallBaseNs = 0L
+            }
+            _frameIntervalIdx = 0
+            _frameIntervalCount = 0
+            _lastOutputFrameNs = 0L
+            Log.i(TAG, "soft video flush (awaiting keyframe)")
+        } catch (e: Exception) {
+            Log.w(TAG, "soft flush failed; hard restart", e)
+            stopCodec()
+        }
+    }
 
     private fun _resetStats() {
         fps = 0; bitrateBps = 0; frameCount = 0; codecName = ""
@@ -132,6 +190,7 @@ class VideoRenderer(ctx: Context) {
     /**
      * Feed a frame already written into [nativeInputBuffer] (first [size] bytes).
      * Called synchronously from the RAOP mirror thread — must not block for long.
+     * Output drain runs on [codecHandler] via [MediaCodec.Callback].
      */
     fun feedFrame(size: Int, ntpTimeNs: Long, isH265: Boolean) {
         synchronized(lock) {
@@ -146,48 +205,55 @@ class VideoRenderer(ctx: Context) {
                     return
                 }
                 stopCodec()
+            } else if (awaitingKeyframe && !_isKeyframe(nativeInputBuffer, size, isH265)) {
+                return
             }
 
             try {
                 if (codec == null) startCodec(isH265)
-                _feedToCodec(size, ntpTimeNs)
-                drainOutput()
+                if (_feedToCodec(size, ntpTimeNs)) {
+                    awaitingKeyframe = false
+                    consecutiveCodecErrors = 0
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "Codec error, resetting", e)
+                consecutiveCodecErrors++
+                Log.w(TAG, "Codec error, resetting (n=$consecutiveCodecErrors)", e)
                 stopCodec()
             }
         }
     }
 
-    private fun _feedToCodec(size: Int, ntpTimeNs: Long) {
-        val c = codec ?: return
-        // dropping a frame desyncs decoder until the next keyframe, but source would only send one on (re)connect
+    private fun _feedToCodec(size: Int, ntpTimeNs: Long): Boolean {
+        val c = codec ?: return false
         // Never block the RAOP mirror thread for tens of ms — 60fps leaves ~16ms/frame.
-        val waitUs = if (firstFrameQueued) FEED_WAIT_US else FIRST_FEED_WAIT_US
+        val waitMs = if (firstFrameQueued) FEED_POLL_MS else FIRST_FEED_POLL_MS
         val retries = if (firstFrameQueued) FEED_RETRIES else FIRST_FEED_RETRIES
         repeat(retries) {
-            val idx = c.dequeueInputBuffer(waitUs)
-            if (idx >= 0) {
-                val buf = c.getInputBuffer(idx) ?: return
-                buf.clear()
-                if (buf.remaining() < size) {
-                    Log.w(TAG, "Codec input buffer too small (${buf.remaining()} < $size); dropping")
-                    c.queueInputBuffer(idx, 0, 0, 0, 0)
-                    droppedFrames++
-                    return
-                }
-                nativeInputBuffer.position(0)
-                nativeInputBuffer.limit(size)
-                buf.put(nativeInputBuffer)
-                nativeInputBuffer.clear()
-                c.queueInputBuffer(idx, 0, size, ntpTimeNs / 1000, 0)
-                firstFrameQueued = true
-                return
+            val idx = freeInputs.poll(waitMs, TimeUnit.MILLISECONDS) ?: return@repeat
+            val buf = try {
+                c.getInputBuffer(idx)
+            } catch (e: Exception) {
+                Log.w(TAG, "getInputBuffer($idx) failed", e)
+                return false
+            } ?: return false
+            buf.clear()
+            if (buf.remaining() < size) {
+                Log.w(TAG, "Codec input buffer too small (${buf.remaining()} < $size); dropping")
+                c.queueInputBuffer(idx, 0, 0, 0, 0)
+                droppedFrames++
+                return false
             }
-            drainOutput()
+            nativeInputBuffer.position(0)
+            nativeInputBuffer.limit(size)
+            buf.put(nativeInputBuffer)
+            nativeInputBuffer.clear()
+            c.queueInputBuffer(idx, 0, size, ntpTimeNs / 1000, 0)
+            firstFrameQueued = true
+            return true
         }
         droppedFrames++
         Log.w(TAG, "Decoder input queue full; dropping frame. drops=$droppedFrames")
+        return false
     }
 
     private fun _isKeyframe(data: ByteBuffer, size: Int, isH265: Boolean): Boolean {
@@ -231,6 +297,8 @@ class VideoRenderer(ctx: Context) {
         val info = (if (h265) hevcDecoder else avcDecoder) ?: error("no decoder selected for $mime")
 
         firstFrameQueued = false
+        awaitingKeyframe = true
+        freeInputs.clear()
         try {
             _startWithLadder(info, mime, s, h265)
         } catch (e: Exception) {
@@ -239,7 +307,7 @@ class VideoRenderer(ctx: Context) {
             Log.w(TAG, "Hardware decoder failed, trying software fallback", e)
             _startWithLadder(sw, mime, s, h265)
         }
-        Log.i(TAG, "Video codec started: $mime ${videoWidth}x${videoHeight} ($codecName)")
+        Log.i(TAG, "Video codec started: $mime ${videoWidth}x${videoHeight} ($codecName) async-callback")
     }
 
     private fun _startWithLadder(info: MediaCodecInfo, mime: String, s: Surface, h265: Boolean) {
@@ -277,9 +345,13 @@ class VideoRenderer(ctx: Context) {
 
     private fun _startDecoder(c: MediaCodec, format: MediaFormat, surface: Surface, h265: Boolean) {
         try {
+            c.setCallback(codecCallback, codecHandler)
             c.configure(format, surface, null, 0)
+            codecAlive.set(true)
             c.start()
         } catch (e: Exception) {
+            codecAlive.set(false)
+            try { c.setCallback(null) } catch (_: Exception) {}
             try { c.release() } catch (_: Exception) {}
             throw e
         }
@@ -287,46 +359,83 @@ class VideoRenderer(ctx: Context) {
         codecName = (if (h265) "H.265" else "H.264") + " (${c.name})"
     }
 
+    private val codecCallback = object : MediaCodec.Callback() {
+        override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
+            if (!codecAlive.get()) return
+            if (!freeInputs.offer(index)) {
+                // Queue full — release empty buffer so the codec does not stall.
+                try { codec.queueInputBuffer(index, 0, 0, 0, 0) } catch (_: Exception) {}
+            }
+        }
+
+        override fun onOutputBufferAvailable(
+            codec: MediaCodec,
+            index: Int,
+            info: MediaCodec.BufferInfo
+        ) {
+            if (!codecAlive.get()) {
+                try { codec.releaseOutputBuffer(index, false) } catch (_: Exception) {}
+                return
+            }
+            try {
+                _recordOutputFrameTime()
+                if (scheduledOutputBufferRelease) {
+                    val ptsUs = info.presentationTimeUs
+                    val renderNs: Long
+                    synchronized(ptsLock) {
+                        if (_ptsBaseUs == Long.MIN_VALUE) {
+                            _ptsBaseUs = ptsUs
+                            _wallBaseNs = System.nanoTime()
+                        }
+                        renderNs = _wallBaseNs + (ptsUs - _ptsBaseUs) * 1000L
+                    }
+                    codec.releaseOutputBuffer(index, renderNs)
+                } else {
+                    codec.releaseOutputBuffer(index, true)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "releaseOutputBuffer failed", e)
+            }
+        }
+
+        override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
+            Log.e(TAG, "MediaCodec async error: ${e.diagnosticInfo}", e)
+            consecutiveCodecErrors++
+            codecHandler.post {
+                synchronized(lock) { stopCodec() }
+            }
+        }
+
+        override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+            Log.i(TAG, "output format: $format")
+        }
+    }
+
     private fun stopCodec() {
+        codecAlive.set(false)
+        freeInputs.clear()
         _frameIntervalIdx = 0
         _frameIntervalCount = 0
         _lastOutputFrameNs = 0L
-        _ptsBaseUs = Long.MIN_VALUE
-        _wallBaseNs = 0L
+        synchronized(ptsLock) {
+            _ptsBaseUs = Long.MIN_VALUE
+            _wallBaseNs = 0L
+        }
         firstFrameQueued = false
+        awaitingKeyframe = true
         codec?.let {
-            try {
-                it.stop()
-                it.release()
-            } catch (_: Exception) {}
+            try { it.stop() } catch (_: Exception) {}
+            try { it.setCallback(null) } catch (_: Exception) {}
+            try { it.release() } catch (_: Exception) {}
         }
         codec = null
-    }
-
-    private fun drainOutput() {
-        val c = codec ?: return
-        val info = MediaCodec.BufferInfo()
-        while (true) {
-            val idx = c.dequeueOutputBuffer(info, 0)
-            if (idx < 0) break
-            _recordOutputFrameTime()
-            if (scheduledOutputBufferRelease) {
-                // schedule frame at VSYNC matching its NTP presentation time
-                val ptsUs = info.presentationTimeUs
-                if (_ptsBaseUs == Long.MIN_VALUE) {
-                    _ptsBaseUs = ptsUs
-                    _wallBaseNs = System.nanoTime()
-                }
-                c.releaseOutputBuffer(idx, _wallBaseNs + (ptsUs - _ptsBaseUs) * 1000L)
-            } else {
-                c.releaseOutputBuffer(idx, true)
-            }
-        }
+        freeInputs.clear()
     }
 
     fun release() = synchronized(lock) {
         stopCodec()
         pipeline.release()
+        codecThread.quitSafely()
         _resetStats()
     }
 
@@ -361,11 +470,11 @@ class VideoRenderer(ctx: Context) {
         private const val BENCH_TAG = "BENCHMARK"
         /** 4MB covers large 4K IDR bursts without reallocating. */
         private const val NATIVE_INPUT_CAPACITY = 4 * 1024 * 1024
-        /** Non-blocking: RAOP mirror thread must keep up with RTP. */
-        private const val FEED_WAIT_US = 0L
+        /** Non-blocking poll of callback-fed input slots. */
+        private const val FEED_POLL_MS = 0L
         private const val FEED_RETRIES = 12
         /** First keyframe may need a brief wait while the decoder warms up. */
-        private const val FIRST_FEED_WAIT_US = 2_000L
+        private const val FIRST_FEED_POLL_MS = 2L
         private const val FIRST_FEED_RETRIES = 50
     }
 }
