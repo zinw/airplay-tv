@@ -231,7 +231,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.switchHud.isChecked = isHudVisible
         binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
         binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
-        binding.switchPin.isChecked = prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
+        binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
         binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
         binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
         binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
@@ -299,6 +299,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val newState = !binding.switchPin.isChecked
             binding.switchPin.isChecked = newState
             prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
+            // restart re-inits native with the new pin_pw / use_pin and clears any stale PIN UI
             airPlayService?.restartServer()
         }
 
@@ -319,7 +320,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.switchHud.isChecked = isHudVisible
         binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
         binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
-        binding.switchPin.isChecked = prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
+        binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
         binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
         binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
         binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
@@ -442,7 +443,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         lifecycleScope.launch {
             service.activeRemotePin.collectLatest { pin ->
                 runOnUiThread {
-                    if (pin != null) {
+                    val show = Prefs.shouldShowPinOverlay(Prefs.isRequirePin(
+                        getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+                    ), pin)
+                    if (show) {
                         binding.tvPinCode.text = pin
                         binding.pinOverlay.visibility = View.VISIBLE
                     } else {

@@ -378,7 +378,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val hwAddr = getHwAddr()
         val keyFile = filesDir.resolve("airplay.pem").absolutePath
         val nohold = prefs.getBoolean(Prefs.ALLOW_NEW_CONN, Prefs.DEF_ALLOW_NEW_CONN)
-        val requirePin = prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
+        val requirePin = Prefs.isRequirePin(prefs)
 
         // oboe's OpenSL ES backend (pre-AAudio devices, API < 27) can't discover native
         // rate / burst size itself; feed it AudioManager values so low-latency buffer
@@ -545,6 +545,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         _durationMs.value = 0
         _serverState.value = ServerState.STOPPED
         _connectionCount.value = 0
+        // drop any on-screen / notification PIN from the previous run so an OFF
+        // toggle (or any restart) cannot leave a stale PIN dialog visible
+        clearPin()
         _refreshDacpPlayer()
         if (stopService) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -809,6 +812,12 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onDisplayPin(pin: String) {
+        // defense in depth: never surface a PIN when the setting is OFF
+        // (native _display_pin also gates on require_pin; some senders still POST pair-pin-start)
+        if (!Prefs.shouldShowPinOverlay(requiresPin(), pin)) {
+            clearPin()
+            return
+        }
         // a new pin is the sync point with the client prompt: show every new value immediately
         if (_lastPin == pin) return
         _lastPin = pin
@@ -1078,9 +1087,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         foregroundStarted = true
     }
 
-    private fun requiresPin(): Boolean {
-        return prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
-    }
+    private fun requiresPin(): Boolean = Prefs.isRequirePin(prefs)
 
     private fun shouldLaunchOnConnect(): Boolean {
         return prefs.getBoolean(Prefs.LAUNCH_ON_CONNECT, Prefs.DEF_LAUNCH_ON_CONNECT)

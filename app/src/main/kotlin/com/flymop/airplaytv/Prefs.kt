@@ -41,7 +41,21 @@ object Prefs {
     const val RESOLUTION = "resolution"; const val DEF_RESOLUTION = AUTO
     const val MAX_FPS = "max_fps"; const val DEF_MAX_FPS = 60
     const val OVERSCANNED = "overscanned"; const val DEF_OVERSCANNED = false
-    const val REQUIRE_PIN = "require_pin"; const val DEF_REQUIRE_PIN = false
+    /** Preference key for on-screen AirPlay PIN pairing. */
+    const val REQUIRE_PIN = "require_pin"
+    /** Fresh installs: PIN pairing is disabled until the user turns it on. */
+    const val DEF_REQUIRE_PIN = false
+
+    fun isRequirePin(prefs: SharedPreferences): Boolean =
+        prefs.getBoolean(REQUIRE_PIN, DEF_REQUIRE_PIN)
+
+    /**
+     * TV PIN overlay / notification should appear only when the user enabled PIN
+     * pairing and native auth actually supplied a code.
+     */
+    fun shouldShowPinOverlay(requirePin: Boolean, pin: String?): Boolean =
+        requirePin && !pin.isNullOrBlank()
+
     const val ALLOW_NEW_CONN = "allow_new_conn"; const val DEF_ALLOW_NEW_CONN = true
     const val AUDIO_LATENCY_MS = "audio_latency_ms"; const val DEF_AUDIO_LATENCY_MS = -1
     const val DEBUG_ENABLED = "debug_enabled"; const val DEF_DEBUG_ENABLED = false

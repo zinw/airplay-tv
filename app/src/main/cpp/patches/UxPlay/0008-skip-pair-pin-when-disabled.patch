@@ -1,0 +1,16 @@
+diff --git a/lib/raop_handlers.h b/lib/raop_handlers.h
+index 9420600..341c93e 100644
+--- a/lib/raop_handlers.h
++++ b/lib/raop_handlers.h
+@@ -253,6 +253,11 @@ raop_handler_pairpinstart(raop_conn_t *conn,
+                           http_request_t *request, http_response_t *response,
+                           char **response_data, int *response_datalen) {
+     raop_t *raop = conn->raop;
++    /* Android / no-PIN runs leave use_pin false; do not mint or challenge a PIN. */
++    if (!raop->use_pin) {
++        logger_log(raop->logger, LOGGER_INFO, "PAIR-PIN-START ignored (PIN auth disabled)");
++        return;
++    }
+     logger_log(raop->logger, LOGGER_INFO, "client sent PAIR-PIN-START request");
+     int pin_4 = 0;
+     if (raop->pin > 9999) {

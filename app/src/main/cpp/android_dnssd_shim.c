@@ -151,6 +151,10 @@ dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
     _txt_set(rec, "deviceid", device_id);
     _txt_set(rec, "features", features);
 
+    /* Auth is advertised via "pw" (+ RAOP "sf"), not AirPlay "flags".
+     * AIRPLAY_FLAGS ("0x84") sets PasswordRequired (bit 7); using it always
+     * made iOS/macOS challenge for a PIN even when require_pin was off.
+     * Match UxPlay dns_sd/mdnsd backends: flags stay AudioCableAttached (0x4). */
     switch (dnssd->pin_pw) {
     case 1:
     case 2:
@@ -161,7 +165,7 @@ dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
         _txt_set(rec, "pw", "false");
         break;
     }
-    _txt_set(rec, "flags", AIRPLAY_FLAGS);
+    _txt_set(rec, "flags", "0x4");
     _txt_set(rec, "model", GLOBAL_MODEL);
     if (dnssd->pk) {
         _txt_set(rec, "pk", dnssd->pk);
