@@ -107,6 +107,8 @@ AirPlay TV uses a hybrid C++/Kotlin architecture:
 ```
 
 For comprehensive technical deep dives, refer to the documentation in [`docs/`](docs/):
+- [User Guide](docs/USER_GUIDE.md)
+- [Competitor Comparison](docs/COMPARISON.md)
 - [System Architecture](docs/architecture.md)
 - [Building & Debugging Guide](docs/building_and_debugging.md)
 - [Video Rendering Pipeline](docs/video_pipeline.md)
@@ -163,10 +165,13 @@ adb install -r AirPlayTV-<SHORT_HASH>-release.apk
 ### 3. Adjusting Settings
 On the Ambient screen, select the **SETTINGS** button using the remote's **OK / Center** button:
 - **Device Name**: Customize the broadcast name displayed in Apple devices.
-- **Performance HUD**: Toggle real-time overlay showing FPS, decoding latency, and audio cushion.
-- **Ultra-Low Latency Audio**: Toggle Google Oboe AAudio game performance path.
+- **Performance HUD**: Toggle real-time overlay showing FPS, resolution, bitrate, drops, and audio cushion (persisted).
+- **Ultra-Low Latency Audio** / **Audio stability**: Trade delay vs glitch resistance on the Oboe path.
 - **H.265 / HEVC Decoding**: Enable/disable 4K HEVC hardware acceleration.
 - **Max Frame Rate & Resolution**: Limit stream resolution or frame rate to optimize for low-power chipsets.
+- **Overscan / Allow new connections / Advertise audio / Start on boot**: TV receiver polish aligned with common competitor settings.
+
+See the [User Guide](docs/USER_GUIDE.md) for install, troubleshooting, and the [competitor comparison](docs/COMPARISON.md).
 
 ---
 

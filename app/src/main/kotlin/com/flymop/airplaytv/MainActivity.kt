@@ -103,7 +103,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        applyKeepScreenOn()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -309,15 +309,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
 
         // Populate initial values
-        val currentName = Prefs.getServerName(prefs)
-        binding.tvSettingDeviceNameVal.text = currentName
-        binding.switchHud.isChecked = isHudVisible
-        binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
-        binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
-        binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
-        binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
-        binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
-        binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        bindSettingsFromPrefs(prefs)
 
         // Home D-pad action row (above the fold)
         binding.btnSettings.setOnClickListener { openSettings() }
@@ -340,12 +332,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             toggleHud()
         }
 
-        // Row: Low-Latency Audio
+        // Row: Low-Latency Audio (hot-applied via audioConfigFlow — no session tear-down)
         binding.rowSettingLowLatency.setOnClickListener {
             val newState = !binding.switchLowLatency.isChecked
             binding.switchLowLatency.isChecked = newState
             prefs.edit().putBoolean(Prefs.LOW_LATENCY, newState).apply()
-            airPlayService?.restartServer()
         }
 
         // Row: H.265 Hardware Video
@@ -353,7 +344,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val newState = !binding.switchH265.isChecked
             binding.switchH265.isChecked = newState
             prefs.edit().putBoolean(Prefs.H265_ENABLED, newState).apply()
-            airPlayService?.restartServer()
+            restartServerWithFeedback()
         }
 
         // Row: Resolution
@@ -364,18 +355,18 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val newRes = resOptions[nextIdx]
             prefs.edit().putString(Prefs.RESOLUTION, newRes).apply()
             binding.tvSettingResolutionVal.text = resolutionLabel(newRes)
-            airPlayService?.restartServer()
+            restartServerWithFeedback()
         }
 
-        // Row: Max FPS
-        val fpsOptions = listOf(60, 30, 120)
+        // Row: Max FPS (ascending: 30 → 60 → 120)
+        val fpsOptions = listOf(30, 60, 120)
         binding.rowSettingMaxFps.setOnClickListener {
             val currentFps = prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)
             val nextIdx = (fpsOptions.indexOf(currentFps) + 1).let { if (it >= fpsOptions.size || it < 0) 0 else it }
             val newFps = fpsOptions[nextIdx]
             prefs.edit().putInt(Prefs.MAX_FPS, newFps).apply()
             binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, newFps)
-            airPlayService?.restartServer()
+            restartServerWithFeedback()
         }
 
         // Row: PIN Security
@@ -383,10 +374,93 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             togglePinFromHome()
         }
 
+        // Row: Overscan
+        binding.rowSettingOverscan.setOnClickListener {
+            val newState = !binding.switchOverscan.isChecked
+            binding.switchOverscan.isChecked = newState
+            prefs.edit().putBoolean(Prefs.OVERSCANNED, newState).apply()
+            restartServerWithFeedback()
+        }
+
+        // Row: Allow new connections
+        binding.rowSettingAllowNewConn.setOnClickListener {
+            val newState = !binding.switchAllowNewConn.isChecked
+            binding.switchAllowNewConn.isChecked = newState
+            prefs.edit().putBoolean(Prefs.ALLOW_NEW_CONN, newState).apply()
+            restartServerWithFeedback()
+        }
+
+        // Row: Advertise audio (mirror-audio style toggle from iMirror/PhairPlay)
+        binding.rowSettingAdvertiseAudio.setOnClickListener {
+            val newState = !binding.switchAdvertiseAudio.isChecked
+            binding.switchAdvertiseAudio.isChecked = newState
+            prefs.edit().putBoolean(Prefs.ADVERTISE_AUDIO, newState).apply()
+            restartServerWithFeedback()
+        }
+
+        // Row: Audio stability (adaptive cushion step — hot-applied via audioConfigFlow)
+        binding.rowSettingAudioStability.setOnClickListener {
+            val current = prefs.getInt(Prefs.AUDIO_ADAPTIVE_STEP, Prefs.DEF_AUDIO_ADAPTIVE_STEP)
+            val next = Prefs.nextAudioAdaptiveStep(current)
+            prefs.edit().putInt(Prefs.AUDIO_ADAPTIVE_STEP, next).apply()
+            binding.tvSettingAudioStabilityVal.setText(audioStabilityLabelRes(next))
+        }
+
+        // Row: Boot auto-start (no server restart needed)
+        binding.rowSettingBootAutoStart.setOnClickListener {
+            val newState = !binding.switchBootAutoStart.isChecked
+            binding.switchBootAutoStart.isChecked = newState
+            prefs.edit().putBoolean(Prefs.BOOT_AUTO_START, newState).apply()
+        }
+
         // Row: Language (System <-> 简体中文 <-> English)
         binding.rowSettingLanguage.setOnClickListener {
             cycleLanguageFromHome()
         }
+    }
+
+    private fun bindSettingsFromPrefs(prefs: android.content.SharedPreferences) {
+        binding.tvSettingDeviceNameVal.text = Prefs.getServerName(prefs)
+        binding.switchHud.isChecked = isHudVisible
+        binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
+        binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
+        binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
+        binding.switchOverscan.isChecked = prefs.getBoolean(Prefs.OVERSCANNED, Prefs.DEF_OVERSCANNED)
+        binding.switchAllowNewConn.isChecked = prefs.getBoolean(Prefs.ALLOW_NEW_CONN, Prefs.DEF_ALLOW_NEW_CONN)
+        binding.switchAdvertiseAudio.isChecked = prefs.getBoolean(Prefs.ADVERTISE_AUDIO, Prefs.DEF_ADVERTISE_AUDIO)
+        binding.switchBootAutoStart.isChecked = prefs.getBoolean(Prefs.BOOT_AUTO_START, Prefs.DEF_BOOT_AUTO_START)
+        binding.tvSettingResolutionVal.text = resolutionLabel(
+            prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION
+        )
+        binding.tvSettingMaxFpsVal.text = getString(
+            R.string.fps_value,
+            prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)
+        )
+        binding.tvSettingAudioStabilityVal.setText(
+            audioStabilityLabelRes(prefs.getInt(Prefs.AUDIO_ADAPTIVE_STEP, Prefs.DEF_AUDIO_ADAPTIVE_STEP))
+        )
+        binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+    }
+
+    private fun audioStabilityLabelRes(step: Int): Int = when (Prefs.audioStabilityBucket(step)) {
+        0 -> R.string.audio_stability_low
+        2 -> R.string.audio_stability_stable
+        else -> R.string.audio_stability_balanced
+    }
+
+    private fun applyKeepScreenOn() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(Prefs.KEEP_SCREEN_ON, Prefs.DEF_KEEP_SCREEN_ON)) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    /** Restart RAOP after a setting that affects advertisement / decode path. */
+    private fun restartServerWithFeedback() {
+        airPlayService?.restartServer()
+        Toast.makeText(this, R.string.settings_applied_reconnect, Toast.LENGTH_SHORT).show()
     }
 
     private fun cycleLanguageFromHome() {
@@ -403,7 +477,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.switchPin.isChecked = newState
         prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
         refreshHomeMeta()
-        airPlayService?.restartServer()
+        restartServerWithFeedback()
     }
 
     private fun resolutionLabel(res: String): String {
@@ -412,14 +486,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun openSettings() {
         val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-        binding.tvSettingDeviceNameVal.text = Prefs.getServerName(prefs)
-        binding.switchHud.isChecked = isHudVisible
-        binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
-        binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
-        binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
-        binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
-        binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
-        binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        bindSettingsFromPrefs(prefs)
         bindVersionLabels()
 
         binding.settingsOverlay.visibility = View.VISIBLE
@@ -455,6 +522,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                         it.restartServer(newName)
                         updateServerInfo(it)
                     }
+                    Toast.makeText(this, R.string.settings_applied_reconnect, Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton(R.string.cancel, null)
@@ -675,6 +743,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         isHudVisible = !isHudVisible
         binding.hudOverlay.visibility = if (isHudVisible) View.VISIBLE else View.GONE
         binding.switchHud.isChecked = isHudVisible
+        getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(Prefs.DEBUG_ENABLED, isHudVisible)
+            .apply()
         if (isHudVisible) {
             mainHandler.removeCallbacks(hudUpdateRunnable)
             mainHandler.post(hudUpdateRunnable)
@@ -688,12 +760,16 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val vRenderer = service.videoRenderer
         val aRenderer = service.audioRenderer
         val audioDbg = aRenderer.audioDebug()
-
-        val videoStats = "${vRenderer.codecName} | ${vRenderer.fps} fps | ${"%.1f".format((vRenderer.bitrateBps / 1000.0) / 1000.0)} Mbps | Drops: ${vRenderer.droppedFrames}"
+        val res = service.videoResolution.value.ifBlank { "—" }
+        val videoStats =
+            "${vRenderer.codecName.ifBlank { "—" }} | $res | ${vRenderer.fps} fps | " +
+                "${"%.1f".format((vRenderer.bitrateBps / 1000.0) / 1000.0)} Mbps | " +
+                "Drops: ${vRenderer.droppedFrames} | Conn: ${service.connectionCount.value}"
         val audioStats = if (audioDbg != null) {
-            "Audio: ${aRenderer.codecLabel} | Cushion: ${audioDbg.tunedCushionMs}ms | XRuns: ${audioDbg.xrun} | Underruns: ${audioDbg.underruns}"
+            "Audio: ${aRenderer.codecLabel} | Cushion: ${audioDbg.tunedCushionMs}ms | " +
+                "XRuns: ${audioDbg.xrun} | Underruns: ${audioDbg.underruns}"
         } else {
-            "Audio: ${aRenderer.codecLabel}"
+            "Audio: ${aRenderer.codecLabel.ifBlank { "idle" }}"
         }
 
         binding.tvHudStats.text = "$videoStats\n$audioStats"
