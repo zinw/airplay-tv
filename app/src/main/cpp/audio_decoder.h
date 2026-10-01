@@ -7,6 +7,7 @@
 #include <sys/resource.h>
 #include <atomic>
 #include <climits>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -186,6 +187,8 @@ public:
     }
 
     bool decode(const uint8_t *data, size_t len, int64_t ptsNs) override {
+        // Don't enqueue while a flush is holding the drain idle — avoids racing flush.
+        if (mPaused.load(std::memory_order_acquire)) return false;
         ssize_t ii = AMediaCodec_dequeueInputBuffer(mCodec, 5000);
         if (ii < 0) return false;
         size_t cap = 0;
@@ -199,16 +202,18 @@ public:
                    AMEDIA_OK && n == len;
     }
 
-    // stop drain, flush codec buffers, restart drain so stale PCM cannot re-enter the ring
+    // Pause drain (no held output buffers), flush codec, resume — avoids join/recreate
+    // on every RAOP FLUSH / next-episode (~ms of pthread churn per switch).
     void flush() override {
-        if (mDrainThread.joinable()) {
-            mDrainRun.store(false, std::memory_order_relaxed);
-            mDrainThread.join();
+        mPaused.store(true, std::memory_order_release);
+        // Wait until drain acknowledges it holds no output buffer (bounded by one dequeue timeout).
+        const int64_t deadlineNs = monoNs() + 50'000'000LL;  // 50ms safety cap
+        while (!mDrainIdle.load(std::memory_order_acquire) && monoNs() < deadlineNs) {
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
         }
         if (mCodec) AMediaCodec_flush(mCodec);
         mProbe.reset();
-        mDrainRun.store(true, std::memory_order_relaxed);
-        mDrainThread = std::thread(&MediaCodecDecoder::drainLoop, this);
+        mPaused.store(false, std::memory_order_release);
     }
 
 private:
@@ -224,8 +229,23 @@ private:
 
         AMediaCodecBufferInfo info;
         while (mDrainRun.load(std::memory_order_relaxed)) {
+            if (mPaused.load(std::memory_order_acquire)) {
+                mDrainIdle.store(true, std::memory_order_release);
+                while (mPaused.load(std::memory_order_acquire) &&
+                       mDrainRun.load(std::memory_order_relaxed)) {
+                    std::this_thread::sleep_for(std::chrono::microseconds(200));
+                }
+                mDrainIdle.store(false, std::memory_order_release);
+                continue;
+            }
+            // Short timeout so pause is noticed quickly during FLUSH.
             ssize_t oi = AMediaCodec_dequeueOutputBuffer(mCodec, &info, DRAIN_TIMEOUT_US);
             if (oi < 0) continue;  // timeout / format / buffers changed
+            if (mPaused.load(std::memory_order_acquire)) {
+                // Acquired a buffer after pause was requested: drop without writing PCM.
+                AMediaCodec_releaseOutputBuffer(mCodec, (size_t)oi, false);
+                continue;
+            }
             size_t osz = 0;
             uint8_t *out = AMediaCodec_getOutputBuffer(mCodec, (size_t)oi, &osz);
             if (out && info.size > 0) {
@@ -239,6 +259,7 @@ private:
             if (lat >= 0) mLat.record(lat);
             mLat.setHeld(mProbe.inFlight());
         }
+        mDrainIdle.store(true, std::memory_order_release);
     }
 
     AMediaCodec *mCodec;                  // owned
@@ -247,6 +268,8 @@ private:
     LatencyProbe mProbe;
     std::thread mDrainThread;
     std::atomic<bool> mDrainRun{false};   // drain thread stop signal
+    std::atomic<bool> mPaused{false};     // flush gate: drain must idle before AMediaCodec_flush
+    std::atomic<bool> mDrainIdle{false};  // drain holds no output buffer
 };
 
 // route ffmpeg warnings/errors to logcat
@@ -332,6 +355,11 @@ public:
         mLat.record(monoNs() - t0);
         mLat.setHeld(0);
         return true;
+    }
+
+    // Drop delayed frames so next-episode / seek does not play a stale ALAC tail.
+    void flush() override {
+        if (mCtx) avcodec_flush_buffers(mCtx);
     }
 
 private:

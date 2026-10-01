@@ -145,6 +145,8 @@ private:
     }
 
     static constexpr int MIN_CUSHION_MS = 20;            // floor prevents chronic underruns on TV SoCs
+    // Music-only adaptive ceiling. Screen-mirror paths force a short fixed cushion in Kotlin
+    // (AudioConfig.forScreenMirror) so lip-sync does not track a growing music buffer.
     static constexpr int MAX_CUSHION_MS = 1000;
     static constexpr int BUCKET_MS = 5;                  // histogram granularity
     static constexpr int NBUCKETS = MAX_CUSHION_MS / BUCKET_MS;

@@ -54,8 +54,10 @@ import com.flymop.airplaytv.bridge.NativeBridge
 import com.flymop.airplaytv.bridge.RaopCallbackHandler
 import com.flymop.airplaytv.discovery.NsdServiceManager
 import com.flymop.airplaytv.renderer.AirPlayVideoPlayer
+import com.flymop.airplaytv.renderer.AudioConfig
 import com.flymop.airplaytv.renderer.AudioRenderer
 import com.flymop.airplaytv.renderer.VideoRenderer
+import com.flymop.airplaytv.renderer.forScreenMirror
 import com.flymop.airplaytv.viewmodel.DebugInfo
 import java.net.NetworkInterface
 import java.security.SecureRandom
@@ -348,8 +350,16 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         lifecycleScope.launch {
             prefs.audioConfigFlow()
                 .debounce(AUDIO_CONFIG_DEBOUNCE_MS)
-                .collect { audioRenderer.updateConfig(it) }
+                .collect { base -> applyAudioConfig(base) }
         }
+    }
+
+    /** True while RAOP reports screen-mirror audio (usingScreen); drives short A/V cushion. */
+    @Volatile private var mirroringAudio = false
+
+    private fun applyAudioConfig(base: AudioConfig = readAudioConfig(prefs)) {
+        val cfg = if (mirroringAudio) base.forScreenMirror() else base
+        audioRenderer.updateConfig(cfg)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -693,6 +703,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
         clearPin()
+        mirroringAudio = usingScreen
+        applyAudioConfig()
         audioRenderer.start()
         audioRenderer.setFormat(ct, spf)
         if (!usingScreen) _setPlaying(true)
@@ -700,7 +712,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             // pure music streaming (not screen mirroring audio)
             _setAudioOnly(true)
         }
-        log("Audio format: ct=$ct spf=$spf screen=$usingScreen")
+        log("Audio format: ct=$ct spf=$spf screen=$usingScreen cushion=${audioRenderer.config.cushionMs}ms")
     }
 
     override fun onVideoSize(srcW: Float, srcH: Float, w: Float, h: Float) {
@@ -875,9 +887,15 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onMirrorRunning(running: Boolean) {
-        if (running) videoRenderer.startSession() else {
+        if (running) {
+            videoRenderer.startSession()
+        } else {
             videoRenderer.stopSession()
             _mirroringActive.value = false
+            if (mirroringAudio) {
+                mirroringAudio = false
+                applyAudioConfig()
+            }
         }
         _setAudioOnly(!running)
     }
