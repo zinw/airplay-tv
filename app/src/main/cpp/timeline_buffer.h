@@ -129,6 +129,15 @@ public:
     // jitter calculations; producer-thread only (same as observe())
     void reanchor() { mHaveBase = false; }
 
+    // RAOP FLUSH / seek / next-episode: drop historical jitter so cushion does not stay
+    // pinned near the adaptive ceiling (can be ~1s) while video presents ASAP.
+    void resetToFloor() {
+        mHaveBase = false;
+        mBaseNs = 0;
+        for (int i = 0; i < NBUCKETS; i++) mHist[i] = 0;
+        mTuned.store(mFloor, std::memory_order_relaxed);
+    }
+
     // latest tuned cushion in samples; any thread
     size_t target() const { return mTuned.load(std::memory_order_relaxed); }
 
@@ -282,30 +291,43 @@ public:
             mRing.skip(mRing.available());
             mPriming = true;
             mPostFlushPrime = true;
+            mPostFlushCatchUpUntilNs = now + POST_FLUSH_CATCHUP_NS;
             mPrimeSilenceFrames = 0;
             mAboveCapSinceNs = 0;
             mUnderran.store(false, std::memory_order_relaxed);
         }
 
         const size_t tuned = mTracker.target();
+        const bool postFlushCatchUp = now < mPostFlushCatchUpUntilNs;
 
         // bound latency: cap tracks tuned cushion live so a calmed link sheds latency
         // without an underrun. each trim costs a glitch, so be conservative: trim only
         // after backlog stayed above cap for TRIM_SUSTAIN (skip transient spikes), at
         // most once per TRIM_THROTTLE, and not within that window of an underrun
-        // (trimming while rebuilding cushion is counterproductive)
+        // (trimming while rebuilding cushion is counterproductive).
+        // Exception: right after RAOP FLUSH, discontinuity bursts must shed immediately
+        // or A/V stays 0.5–2s apart until the sustain timer fires.
         const size_t avail = mRing.available();
-        if (avail > capOf(tuned)) {
-            if (mAboveCapSinceNs == 0) mAboveCapSinceNs = now;
+        if (postFlushCatchUp) {
+            // Same ceiling as steady-state, but no 1s sustain — shed FLUSH bursts promptly.
+            if (avail > capOf(tuned)) {
+                mRing.skip(avail - tuned);
+                mMetrics.countTrim();
+                mAboveCapSinceNs = 0;
+            }
         } else {
-            mAboveCapSinceNs = 0;
-        }
-        if (mAboveCapSinceNs != 0 && now - mAboveCapSinceNs >= TRIM_SUSTAIN_NS
-                && now - mLastTrimBlockNs >= TRIM_THROTTLE_NS) {
-            mRing.skip(avail - tuned);
-            mMetrics.countTrim();
-            mLastTrimBlockNs = now;
-            mAboveCapSinceNs = 0;
+            if (avail > capOf(tuned)) {
+                if (mAboveCapSinceNs == 0) mAboveCapSinceNs = now;
+            } else {
+                mAboveCapSinceNs = 0;
+            }
+            if (mAboveCapSinceNs != 0 && now - mAboveCapSinceNs >= TRIM_SUSTAIN_NS
+                    && now - mLastTrimBlockNs >= TRIM_THROTTLE_NS) {
+                mRing.skip(avail - tuned);
+                mMetrics.countTrim();
+                mLastTrimBlockNs = now;
+                mAboveCapSinceNs = 0;
+            }
         }
 
         // prebuffer: hold output until cushion fills, builds jitter headroom.
@@ -323,6 +345,17 @@ public:
             if (buffered == 0 || (buffered < primeTarget && !starved)) {
                 memset(out, 0, need * sizeof(int16_t));
                 return;
+            }
+            // Priming does not drain the ring. A post-FLUSH RTP/decode burst can therefore
+            // grow far past primeTarget before this callback runs; start playout from the
+            // live edge (tuned cushion) so audio is not half a beat behind video.
+            if (mPostFlushPrime) {
+                const size_t have = mRing.available();
+                const size_t want = std::max(primeTarget, tuned);
+                if (have > want) {
+                    mRing.skip(have - want);
+                    mMetrics.countTrim();
+                }
             }
             mPriming = false;
             mPostFlushPrime = false;
@@ -342,13 +375,13 @@ public:
 
     // call after discontinuity or clock shift/resync; producer-side, must not run
     // concurrently with write()
-    void reanchorTracker() { mTracker.reanchor(); }
+    void reanchorTracker() { mTracker.resetToFloor(); }
 
     // producer (or same thread as write): request consumer to discard backlog and
     // reprime with a short post-flush cushion. safe while Oboe is reading.
     void requestFlush() {
         mExpectedPtsNs = 0;
-        mTracker.reanchor();
+        mTracker.resetToFloor();
         mFlushRequested.store(true, std::memory_order_release);
     }
 
@@ -361,10 +394,11 @@ public:
     void flushAndReprime() {
         mRing.skip(mRing.available());
         mExpectedPtsNs = 0;
-        mTracker.reanchor();
+        mTracker.resetToFloor();
         mFlushRequested.store(false, std::memory_order_relaxed);
         mPriming = true;
         mPostFlushPrime = false;
+        mPostFlushCatchUpUntilNs = 0;
         mPrimeSilenceFrames = 0;
         mAboveCapSinceNs = 0;
         mUnderran.store(false, std::memory_order_relaxed);
@@ -414,6 +448,9 @@ private:
     static constexpr int TRIM_SUSTAIN_MS = 1000;         // backlog must exceed cap this long before trim
     static constexpr int64_t TRIM_SUSTAIN_NS = (int64_t)TRIM_SUSTAIN_MS * 1'000'000LL;
     static constexpr int POST_FLUSH_PRIME_MS = 40;       // short prime after seek / episode FLUSH
+    static constexpr int POST_FLUSH_CATCHUP_MS = 3000;   // aggressive trim window after FLUSH
+    static constexpr int64_t POST_FLUSH_CATCHUP_NS =
+            (int64_t)POST_FLUSH_CATCHUP_MS * 1'000'000LL;
 
     const int mSampleRate;
     const int mChannels;
@@ -425,6 +462,7 @@ private:
     uint32_t mPrimeSilenceFrames = 0;    // consumer-only: silence frames output while priming with partial data
     int64_t mLastTrimBlockNs = 0;        // consumer-only: last trim/underrun time (trim throttle)
     int64_t mAboveCapSinceNs = 0;        // consumer-only: when backlog first exceeded cap (0 = under)
+    int64_t mPostFlushCatchUpUntilNs = 0; // consumer-only: immediate-trim deadline after FLUSH
     std::atomic<bool> mUnderran{false};  // consumer->producer: underrun happened
     std::atomic<bool> mFlushRequested{false};  // producer->consumer: discard backlog
 
