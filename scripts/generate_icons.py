@@ -12,15 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "app" / "src" / "main" / "res"
 DOCS = ROOT / "docs" / "assets"
 
-# Living-room TV palette (teal / amber — no purple)
 BG_TOP = (10, 22, 30, 255)
 BG_BOTTOM = (6, 12, 18, 255)
 TEAL = (61, 220, 255, 255)
-TEAL_SOFT = (61, 220, 255, 160)
-TEAL_DIM = (61, 220, 255, 90)
 AMBER = (255, 200, 87, 255)
 FRAME = (36, 58, 72, 255)
 SCREEN = (14, 28, 38, 255)
+STAND = (58, 85, 104, 255)
 WHITE = (242, 247, 250, 255)
 MUTED = (168, 184, 196, 255)
 
@@ -39,90 +37,71 @@ def vertical_gradient(size: int, top=BG_TOP, bottom=BG_BOTTOM) -> Image.Image:
     return img
 
 
-def draw_mark(draw: ImageDraw.ImageDraw, cx: float, cy: float, scale: float, mono: bool = False):
-    """Draw TV + inbound cast arcs (not an AirPlay triangle)."""
-    s = scale
-    frame = WHITE if mono else FRAME
-    screen = (0, 0, 0, 0) if mono else SCREEN
-    arc = WHITE if mono else TEAL
-    arc2 = (255, 255, 255, 160) if mono else TEAL_SOFT
-    arc3 = (255, 255, 255, 90) if mono else TEAL_DIM
-    led = WHITE if mono else AMBER
+def draw_mark(base: Image.Image, cx: float, cy: float, scale: float) -> Image.Image:
+    """TV screen + inbound cast arcs (receiver metaphor, not an AirPlay triangle)."""
+    glow = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for i in range(16, 0, -1):
+        rr = 11 * scale * (i / 16)
+        gd.ellipse(
+            [cx - rr, cy - 4 * scale - rr, cx + rr, cy - 4 * scale + rr],
+            fill=(61, 220, 255, int(14 * i / 16)),
+        )
+    base = Image.alpha_composite(base, glow)
+    d = ImageDraw.Draw(base)
 
-    # TV body
-    tw, th = 54 * s, 36 * s
-    left, top = cx - tw / 2, cy - th / 2 - 2 * s
-    right, bottom = cx + tw / 2, cy + th / 2 - 2 * s
-    radius = 5 * s
-    draw.rounded_rectangle([left, top, right, bottom], radius=radius, fill=frame)
-    inset = 3.2 * s
-    draw.rounded_rectangle(
+    tw, th = 54 * scale, 36 * scale
+    left, top = cx - tw / 2, cy - th / 2 - 2 * scale
+    right, bottom = cx + tw / 2, cy + th / 2 - 2 * scale
+    d.rounded_rectangle([left, top, right, bottom], radius=5 * scale, fill=FRAME)
+    inset = 3.2 * scale
+    d.rounded_rectangle(
         [left + inset, top + inset, right - inset, bottom - inset],
-        radius=max(2.0, radius - 1.5 * s),
-        fill=screen if not mono else None,
-        outline=WHITE if mono else None,
-        width=max(1, int(1.5 * s)) if mono else 0,
+        radius=max(2.0, 3.5 * scale),
+        fill=SCREEN,
     )
 
-    # Stand
-    neck_w, neck_h = 3.2 * s, 5 * s
-    draw.rectangle(
-        [cx - neck_w / 2, bottom - 0.5 * s, cx + neck_w / 2, bottom + neck_h],
-        fill=frame,
+    d.rectangle(
+        [cx - 1.6 * scale, bottom - 0.5 * scale, cx + 1.6 * scale, bottom + 5 * scale],
+        fill=FRAME,
     )
-    base_w, base_h = 18 * s, 2.4 * s
-    draw.rounded_rectangle(
-        [cx - base_w / 2, bottom + neck_h, cx + base_w / 2, bottom + neck_h + base_h],
-        radius=1.2 * s,
-        fill=frame,
+    d.rounded_rectangle(
+        [cx - 9 * scale, bottom + 5 * scale, cx + 9 * scale, bottom + 7.4 * scale],
+        radius=1.2 * scale,
+        fill=STAND,
     )
 
-    # Cast arcs rising into the screen (receiver metaphor)
-    origin_x, origin_y = cx, bottom - inset - 2 * s
-    for radius_r, width, color in (
-        (9 * s, max(1, int(1.6 * s)), arc),
-        (14 * s, max(1, int(1.8 * s)), arc2),
-        (19 * s, max(1, int(2.0 * s)), arc3),
+    ox, oy = cx, bottom - inset - 2.2 * scale
+    for radius_r, width, alpha in (
+        (9 * scale, max(2, int(2.0 * scale)), 255),
+        (14 * scale, max(2, int(2.2 * scale)), 200),
+        (19 * scale, max(2, int(2.4 * scale)), 120),
     ):
-        bbox = [
-            origin_x - radius_r,
-            origin_y - radius_r,
-            origin_x + radius_r,
-            origin_y + radius_r,
-        ]
-        draw.arc(bbox, start=220, end=320, fill=color, width=width)
+        pts = []
+        for deg in range(220, 321, 2):
+            rad = math.radians(deg)
+            pts.append((ox + radius_r * math.cos(rad), oy + radius_r * math.sin(rad)))
+        if len(pts) >= 2:
+            d.line(pts, fill=(61, 220, 255, alpha), width=width, joint="curve")
 
-    # Source / receiver node
-    r = 2.4 * s
-    draw.ellipse([origin_x - r, origin_y - r, origin_x + r, origin_y + r], fill=led)
-
-    # Soft screen glow (skip for mono)
-    if not mono:
-        glow_r = 10 * s
-        gx, gy = cx, cy - 4 * s
-        for i in range(8, 0, -1):
-            alpha = int(18 * (i / 8))
-            rr = glow_r * (i / 8)
-            draw.ellipse(
-                [gx - rr, gy - rr, gx + rr, gy + rr],
-                fill=(61, 220, 255, alpha),
-            )
+    r = 2.6 * scale
+    d.ellipse([ox - r, oy - r, ox + r, oy + r], fill=AMBER)
+    return base
 
 
 def make_launcher(size: int, round_mask: bool = False) -> Image.Image:
     img = vertical_gradient(size)
-    # Ambient glow
     glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    gdraw = ImageDraw.Draw(glow)
+    gd = ImageDraw.Draw(glow)
     cx = cy = size / 2
-    for i in range(24, 0, -1):
-        rr = size * 0.34 * (i / 24)
-        alpha = int(40 * (i / 24))
-        gdraw.ellipse([cx - rr, cy - rr - size * 0.04, cx + rr, cy + rr - size * 0.04], fill=(61, 220, 255, alpha))
+    for i in range(20, 0, -1):
+        rr = size * 0.32 * (i / 20)
+        gd.ellipse(
+            [cx - rr, cy - rr - size * 0.04, cx + rr, cy + rr - size * 0.04],
+            fill=(61, 220, 255, int(28 * i / 20)),
+        )
     img = Image.alpha_composite(img, glow)
-
-    draw = ImageDraw.Draw(img)
-    draw_mark(draw, cx, cy, scale=size / 108.0)
+    img = draw_mark(img, cx, cy, size / 108.0)
 
     if round_mask:
         mask = Image.new("L", (size, size), 0)
@@ -141,44 +120,49 @@ def make_banner(width: int = 320, height: int = 180) -> Image.Image:
             t = (x / max(width - 1, 1) * 0.35) + (y / max(height - 1, 1) * 0.65)
             px[x, y] = lerp(BG_TOP, BG_BOTTOM, t)
 
-    # Soft vignette glow behind mark
     overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
     gx, gy = width * 0.28, height * 0.48
-    for i in range(30, 0, -1):
-        rr = height * 0.42 * (i / 30)
-        od.ellipse([gx - rr, gy - rr, gx + rr, gy + rr], fill=(61, 220, 255, int(22 * i / 30)))
+    for i in range(24, 0, -1):
+        rr = height * 0.4 * (i / 24)
+        od.ellipse([gx - rr, gy - rr, gx + rr, gy + rr], fill=(61, 220, 255, int(18 * i / 24)))
     img = Image.alpha_composite(img, overlay)
+    img = draw_mark(img, width * 0.28, height * 0.48, height / 78.0)
 
     draw = ImageDraw.Draw(img)
-    draw_mark(draw, width * 0.28, height * 0.48, scale=height / 78.0)
-
-    # Wordmark
-    title = "AirPlay TV"
-    subtitle = "Cast • Mirror • Stream"
+    title_size = 28 if width <= 320 else 72
+    sub_size = 13 if width <= 320 else 28
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
-        font_sm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", title_size)
+        font_sm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", sub_size)
     except OSError:
         font = ImageFont.load_default()
         font_sm = font
 
     tx = int(width * 0.48)
     ty = int(height * 0.36)
-    draw.text((tx, ty), title, fill=WHITE, font=font)
-    draw.text((tx, ty + 36), subtitle, fill=MUTED, font=font_sm)
-    # Accent underline
-    draw.rounded_rectangle([tx, ty + 30, tx + 56, ty + 33], radius=2, fill=TEAL)
+    underline_y = ty + (32 if width <= 320 else 78)
+    underline_h = 3 if width <= 320 else 6
+    underline_w = 56 if width <= 320 else 120
+    sub_y = ty + (40 if width <= 320 else 96)
+
+    draw.text((tx, ty), "AirPlay TV", fill=WHITE, font=font)
+    draw.rounded_rectangle(
+        [tx, underline_y, tx + underline_w, underline_y + underline_h],
+        radius=2,
+        fill=TEAL,
+    )
+    draw.text((tx, sub_y), "Cast • Mirror • Stream", fill=MUTED, font=font_sm)
     return img
 
 
-def save(img: Image.Image, path: Path):
+def save(img: Image.Image, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path, "PNG")
     print(f"wrote {path.relative_to(ROOT)} ({img.size[0]}x{img.size[1]})")
 
 
-def main():
+def main() -> None:
     densities = {
         "mipmap-mdpi": 48,
         "mipmap-hdpi": 72,
@@ -193,7 +177,10 @@ def main():
     save(make_banner(320, 180), RES / "drawable" / "banner.png")
     DOCS.mkdir(parents=True, exist_ok=True)
     save(make_launcher(512, round_mask=False), DOCS / "app_icon.png")
+    save(make_launcher(1024, round_mask=False), DOCS / "app_icon_1024.png")
     save(make_banner(1280, 720), DOCS / "app_banner.png")
+    save(make_banner(320, 180), DOCS / "banner_leanback.png")
+    save(make_launcher(512, round_mask=True), DOCS / "github_avatar.png")
 
 
 if __name__ == "__main__":
