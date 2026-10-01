@@ -12,8 +12,8 @@ android {
         applicationId = "com.flymop.airplaytv"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -31,10 +31,30 @@ android {
         }
     }
 
+    // Single committed keystore so CI / local assembleRelease share one cert.
+    // v1.0.1–v1.0.3 each used a different ephemeral ~/.android/debug.keystore.
+    signingConfigs {
+        create("upload") {
+            val ks = rootProject.file("keystore/airplaytv-upload.keystore")
+            storeFile = ks
+            storePassword = "airplaytv"
+            keyAlias = "airplaytv"
+            keyPassword = "airplaytv"
+        }
+        // Override default debug so USB debug installs match release overlays.
+        getByName("debug") {
+            val ks = rootProject.file("keystore/airplaytv-upload.keystore")
+            storeFile = ks
+            storePassword = "airplaytv"
+            keyAlias = "airplaytv"
+            keyPassword = "airplaytv"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("upload")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -43,6 +63,7 @@ android {
         debug {
             isMinifyEnabled = false
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("upload")
         }
     }
 
