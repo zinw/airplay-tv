@@ -190,6 +190,26 @@ For full details on Wireless ADB setup, logcat filtering, Performance HUD diagno
 
 ---
 
+## 📲 In-App Update Check (Self-Testing Builds)
+
+On cold start the app queries the public GitHub Releases API for [`zinw/airplay-tv`](https://github.com/zinw/airplay-tv/releases/latest). If a newer build is found, a confirm dialog is shown; only after the user accepts does the app download the release APK and hand it to the system package installer. Offline / rate-limit failures are soft (logged, never crash or block the home screen).
+
+### How to publish a test release the updater can see
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. Build an APK, e.g. `./gradlew assembleDebug` or `./gradlew assembleRelease`.
+3. Create a **non-draft** GitHub Release on `zinw/airplay-tv`:
+   - **Tag** (required for name compare): `v{versionName}` such as `v1.0.1`.
+   - **Preferred for versionCode compare**: put a line `versionCode: N` in the release body (same `N` as `app/build.gradle.kts`), **or** use tag metadata `v1.0.1+N`.
+   - **Attach** a clearly named `.apk` asset, for example:
+     - `app-debug.apk` / `app-universal-release.apk`, or
+     - ABI-specific names containing `arm64-v8a`, `armeabi-v7a`, `x86_64`, or `universal` (the app prefers the device ABI, then universal).
+4. Publish the release. Relaunch the installed older build on the TV; it should prompt once per process start.
+
+Version comparison order: body `versionCode` → tag `+versionCode` / numeric tag → SemVer `versionName` from the tag.
+
+---
+
 ## 🤝 Acknowledgements & Credits
 
 This project is built upon the incredible work of the open-source community:
