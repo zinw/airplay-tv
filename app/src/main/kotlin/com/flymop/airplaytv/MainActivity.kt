@@ -109,8 +109,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
         binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
         binding.switchPin.isChecked = prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
-        binding.tvSettingResolutionVal.text = prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION
-        binding.tvSettingMaxFpsVal.text = "${prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)} FPS"
+        binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
+        binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
+        binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
 
         // Open settings button on main screen
         binding.btnSettings.setOnClickListener {
@@ -155,7 +156,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val nextIdx = (resOptions.indexOf(currentRes) + 1).let { if (it >= resOptions.size || it < 0) 0 else it }
             val newRes = resOptions[nextIdx]
             prefs.edit().putString(Prefs.RESOLUTION, newRes).apply()
-            binding.tvSettingResolutionVal.text = newRes
+            binding.tvSettingResolutionVal.text = resolutionLabel(newRes)
             airPlayService?.restartServer()
         }
 
@@ -166,7 +167,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val nextIdx = (fpsOptions.indexOf(currentFps) + 1).let { if (it >= fpsOptions.size || it < 0) 0 else it }
             val newFps = fpsOptions[nextIdx]
             prefs.edit().putInt(Prefs.MAX_FPS, newFps).apply()
-            binding.tvSettingMaxFpsVal.text = "$newFps FPS"
+            binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, newFps)
             airPlayService?.restartServer()
         }
 
@@ -177,6 +178,16 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
             airPlayService?.restartServer()
         }
+
+        // Row: Language (English <-> 简体中文)
+        binding.rowSettingLanguage.setOnClickListener {
+            val next = LocaleHelper.cycleLanguage(prefs)
+            binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(next))
+        }
+    }
+
+    private fun resolutionLabel(res: String): String {
+        return if (res == Prefs.AUTO) getString(R.string.resolution_auto) else res
     }
 
     private fun openSettings() {
@@ -186,8 +197,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
         binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
         binding.switchPin.isChecked = prefs.getBoolean(Prefs.REQUIRE_PIN, Prefs.DEF_REQUIRE_PIN)
-        binding.tvSettingResolutionVal.text = prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION
-        binding.tvSettingMaxFpsVal.text = "${prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS)} FPS"
+        binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
+        binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
+        binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
 
         binding.settingsOverlay.visibility = View.VISIBLE
         binding.rowSettingDeviceName.requestFocus()
@@ -210,9 +222,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
 
         AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
-            .setTitle("Edit Device Name")
+            .setTitle(R.string.edit_device_name_title)
             .setView(input)
-            .setPositiveButton("Save") { _, _ ->
+            .setPositiveButton(R.string.save) { _, _ ->
                 val newName = input.text.toString().trim()
                 if (newName.isNotEmpty()) {
                     prefs.edit().putString(Prefs.SERVER_NAME, newName).apply()
@@ -224,7 +236,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
