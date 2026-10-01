@@ -101,10 +101,12 @@ struct AudioEngine {
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
     }
 
-    // RAOP FLUSH / seek / next-episode discontinuity: clear decoder delay + playout backlog
+    // RAOP FLUSH / seek / next-episode discontinuity: clear playout backlog + decoder delay.
+    // Request timeline flush first so any PCM the soft MediaCodec flush races out is dropped
+    // until the Oboe callback applies the discard (avoids queuing behind a stale head).
     void flush() {
-        if (mDecoder.decoder) mDecoder.decoder->flush();
         if (mTimeline) mTimeline->requestFlush();
+        if (mDecoder.decoder) mDecoder.decoder->flush();
     }
 
     bool copyDebug(void *dst, size_t dstLen) {
