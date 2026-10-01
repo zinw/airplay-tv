@@ -524,6 +524,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                             binding.tvStatus.text = getString(R.string.status_broadcasting)
                             binding.tvStatus.setTextColor(getColor(R.color.tv_status_green))
                             binding.tvStatus.setBackgroundResource(R.drawable.bg_status_capsule)
+                            // rename / settings restartServer does not recreate SurfaceView —
+                            // reattach so VideoPipeline gets a live display after GL reset
+                            binding.surfaceView.holder.surface?.takeIf { it.isValid }?.let {
+                                service.videoRenderer.setSurface(it)
+                            }
                         }
                         ServerState.STOPPED -> {
                             binding.tvStatus.text = getString(R.string.status_stopped)

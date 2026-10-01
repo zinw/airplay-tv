@@ -541,7 +541,14 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         nsdManager = null
         wakeLock?.release()
         wakeLock = null
-        videoRenderer.release()
+        // Rename / settings restart must NOT call release() — that quit the codec
+        // HandlerThread and dropped the GL display bind, causing mirror black until
+        // process death. Only fully release when the service is going away.
+        if (stopService) {
+            videoRenderer.release()
+        } else {
+            videoRenderer.resetForServerRestart()
+        }
         airPlayVideoPlayer.stop()
         mediaSession?.isActive = false
         _audioOnly.value = false
