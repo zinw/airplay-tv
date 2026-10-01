@@ -1,157 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Background Gradient -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#111728"/>
-      <stop offset="50%" stop-color="#0B0E17"/>
-      <stop offset="100%" stop-color="#04060A"/>
+      <stop offset="0%" stop-color="#0F2230"/>
+      <stop offset="55%" stop-color="#0A161E"/>
+      <stop offset="100%" stop-color="#061018"/>
     </linearGradient>
-
-    <!-- TV Frame Bezel (Metallic Dark Slate) -->
-    <linearGradient id="tvBezel" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#41506E"/>
-      <stop offset="20%" stop-color="#242E42"/>
-      <stop offset="100%" stop-color="#141926"/>
+    <radialGradient id="glow" cx="50%" cy="42%" r="42%">
+      <stop offset="0%" stop-color="#3DDCFF" stop-opacity="0.35"/>
+      <stop offset="55%" stop-color="#3DDCFF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#3DDCFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="screen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#152836"/>
+      <stop offset="100%" stop-color="#0A161E"/>
     </linearGradient>
-
-    <!-- TV Screen Deep OLED Gradient -->
-    <linearGradient id="tvScreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#18233C"/>
-      <stop offset="50%" stop-color="#0E1527"/>
-      <stop offset="100%" stop-color="#080C16"/>
-    </linearGradient>
-
-    <!-- AirPlay Vivid Gradient -->
-    <linearGradient id="airplayNeon" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00F5FF"/>
-      <stop offset="45%" stop-color="#0077FE"/>
-      <stop offset="100%" stop-color="#9333EA"/>
-    </linearGradient>
-
-    <!-- AirPlay Arc 1 (Inner) -->
-    <linearGradient id="arc1" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00F5FF"/>
-      <stop offset="50%" stop-color="#2563EB"/>
-      <stop offset="100%" stop-color="#A855F7"/>
-    </linearGradient>
-
-    <!-- AirPlay Arc 2 (Mid) -->
-    <linearGradient id="arc2" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00F5FF" stop-opacity="0.8"/>
-      <stop offset="50%" stop-color="#3B82F6" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#C084FC" stop-opacity="0.8"/>
-    </linearGradient>
-
-    <!-- AirPlay Arc 3 (Outer) -->
-    <linearGradient id="arc3" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00F5FF" stop-opacity="0.45"/>
-      <stop offset="50%" stop-color="#60A5FA" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#E879F9" stop-opacity="0.45"/>
-    </linearGradient>
-
-    <!-- TV Stand Gradient -->
-    <linearGradient id="standGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#4B5875"/>
-      <stop offset="50%" stop-color="#263044"/>
-      <stop offset="100%" stop-color="#141A26"/>
-    </linearGradient>
-
-    <!-- Specular Glass Gradient -->
-    <linearGradient id="glassReflection" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.18"/>
-      <stop offset="28%" stop-color="#FFFFFF" stop-opacity="0.04"/>
-      <stop offset="29%" stop-color="#FFFFFF" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
-    </linearGradient>
-
-    <!-- Material Elevation Drop Shadow -->
-    <filter id="tvElevation" x="-20%" y="-20%" width="140%" height="145%">
-      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.85"/>
-    </filter>
-
-    <!-- Ambient Backlight -->
-    <filter id="backlight" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="48"/>
-    </filter>
-
-    <!-- Intense Neon Glow -->
-    <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <clipPath id="screenClipArea">
-      <rect x="70" y="86" width="372" height="256" rx="16"/>
-    </clipPath>
   </defs>
 
-  <!-- 1. Background Squircle Base -->
-  <rect x="8" y="8" width="496" height="496" rx="112" fill="url(#bgGrad)" stroke="#1F2A3F" stroke-width="2"/>
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+  <circle cx="256" cy="230" r="170" fill="url(#glow)"/>
 
-  <!-- 2. Colorful Ambient Aura -->
-  <circle cx="256" cy="190" r="150" fill="#00F5FF" opacity="0.14" filter="url(#backlight)"/>
-  <circle cx="256" cy="250" r="130" fill="#9333EA" opacity="0.16" filter="url(#backlight)"/>
+  <!-- TV bezel -->
+  <rect x="108" y="148" width="296" height="188" rx="28" fill="#243A48"/>
+  <rect x="122" y="162" width="268" height="160" rx="16" fill="url(#screen)"/>
 
-  <!-- 3. TV Body with Realistic Elevation Shadow -->
-  <g filter="url(#tvElevation)">
-    <!-- Stand Column -->
-    <path d="M244 358 L244 388 L268 388 L268 358 Z" fill="url(#standGrad)"/>
-    <!-- Stand Horizontal Pedestal Base -->
-    <path d="M172 388 C172 384 176 382 184 382 L328 382 C336 382 340 384 340 388 L346 395 C346 398 342 400 334 400 L178 400 C170 400 166 398 166 395 Z" 
-          fill="url(#standGrad)" stroke="#3E4E6E" stroke-width="1.2"/>
-    <line x1="184" y1="384" x2="328" y2="384" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+  <!-- Soft screen glow -->
+  <circle cx="256" cy="230" r="56" fill="#3DDCFF" opacity="0.18"/>
 
-    <!-- TV Frame Bezel -->
-    <rect x="54" y="70" width="404" height="288" rx="26" fill="url(#tvBezel)" stroke="#4A5C7E" stroke-width="2"/>
+  <!-- Inbound cast arcs -->
+  <path d="M176 300 C200 250 228 224 256 224 C284 224 312 250 336 300"
+        fill="none" stroke="#3DDCFF" stroke-width="12" stroke-linecap="round" opacity="0.55"/>
+  <path d="M196 308 C214 272 232 252 256 252 C280 252 298 272 316 308"
+        fill="none" stroke="#3DDCFF" stroke-width="13" stroke-linecap="round" opacity="0.8"/>
+  <path d="M216 316 C228 292 240 278 256 278 C272 278 284 292 296 316"
+        fill="none" stroke="#3DDCFF" stroke-width="14" stroke-linecap="round"/>
 
-    <!-- Screen Bezel Inset -->
-    <rect x="68" y="84" width="376" height="260" rx="18" fill="#080C14" stroke="#1C2436" stroke-width="1.2"/>
+  <!-- Receiver node -->
+  <circle cx="256" cy="324" r="12" fill="#FFC857"/>
 
-    <!-- TV Active Screen Display (Clipped) -->
-    <g clip-path="url(#screenClipArea)">
-      <!-- OLED Screen Panel -->
-      <rect x="70" y="86" width="372" height="256" rx="16" fill="url(#tvScreen)"/>
-
-      <!-- Ambient Core Aura behind AirPlay Icon -->
-      <circle cx="256" cy="260" r="110" fill="#00F5FF" opacity="0.22" filter="url(#neonGlow)"/>
-      <circle cx="256" cy="210" r="90" fill="#9333EA" opacity="0.26" filter="url(#neonGlow)"/>
-
-      <!-- Radiant Mirroring Waves (AirPlay Pulse) -->
-      <!-- Arc 3 (Outer) -->
-      <path d="M138 238 C166 170 208 136 256 136 C304 136 346 170 374 238" 
-            fill="none" stroke="url(#arc3)" stroke-width="8" stroke-linecap="round"/>
-
-      <!-- Arc 2 (Middle) -->
-      <path d="M170 250 C192 196 222 168 256 168 C290 168 320 196 342 250" 
-            fill="none" stroke="url(#arc2)" stroke-width="10" stroke-linecap="round" filter="url(#neonGlow)"/>
-
-      <!-- Arc 1 (Inner) -->
-      <path d="M202 262 C216 224 234 202 256 202 C278 202 296 224 310 262" 
-            fill="none" stroke="url(#arc1)" stroke-width="12" stroke-linecap="round" filter="url(#neonGlow)"/>
-
-      <!-- AirPlay Glowing Solid Triangle -->
-      <g filter="url(#neonGlow)">
-        <!-- Base Neon Triangle -->
-        <path d="M256 208 L320 298 C326 307 319 316 308 316 L204 316 C193 316 186 307 192 298 Z" 
-              fill="url(#airplayNeon)"/>
-        <!-- Specular Facet -->
-        <path d="M256 218 L300 284 C304 290 300 295 294 295 L218 295 C212 295 208 290 212 284 Z" 
-              fill="#FFFFFF" opacity="0.32"/>
-      </g>
-
-      <!-- Glass Specular Reflection Overlay -->
-      <rect x="70" y="86" width="372" height="256" rx="16" fill="url(#glassReflection)"/>
-    </g>
-
-    <!-- TV Bezel Power Indicator (Emerald / Cyan status glow) -->
-    <circle cx="256" cy="345" r="3.2" fill="#00F5FF" filter="url(#neonGlow)"/>
-    <circle cx="256" cy="345" r="1.4" fill="#FFFFFF"/>
-  </g>
-
-  <!-- 4. Top Container Specular Rim Highlight -->
-  <rect x="9" y="9" width="494" height="494" rx="111" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+  <!-- Stand -->
+  <rect x="244" y="336" width="24" height="28" rx="3" fill="#2A4558"/>
+  <path d="M186 364 H326 C334 364 338 368 338 372 L334 382 C333 385 330 388 326 388 H186 C182 388 179 385 178 382 L174 372 C174 368 178 364 186 364 Z" fill="#3A5568"/>
 </svg>

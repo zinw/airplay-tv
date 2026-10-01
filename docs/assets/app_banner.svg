@@ -1,120 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
   <defs>
-    <linearGradient id="banBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#11172A"/>
-      <stop offset="40%" stop-color="#090D18"/>
-      <stop offset="100%" stop-color="#04060B"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F2230"/>
+      <stop offset="100%" stop-color="#061018"/>
     </linearGradient>
-
-    <linearGradient id="banAccent" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00F0FF"/>
-      <stop offset="50%" stop-color="#3B82F6"/>
-      <stop offset="100%" stop-color="#A855F7"/>
+    <radialGradient id="glow" cx="28%" cy="48%" r="35%">
+      <stop offset="0%" stop-color="#3DDCFF" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#3DDCFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="screen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#152836"/>
+      <stop offset="100%" stop-color="#0A161E"/>
     </linearGradient>
-
-    <linearGradient id="tvBezelBan" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#41506E"/>
-      <stop offset="20%" stop-color="#242E42"/>
-      <stop offset="100%" stop-color="#141926"/>
-    </linearGradient>
-
-    <linearGradient id="tvScreenBan" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#18233C"/>
-      <stop offset="50%" stop-color="#0E1527"/>
-      <stop offset="100%" stop-color="#080C16"/>
-    </linearGradient>
-
-    <linearGradient id="glassBan" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.16"/>
-      <stop offset="28%" stop-color="#FFFFFF" stop-opacity="0.03"/>
-      <stop offset="29%" stop-color="#FFFFFF" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
-    </linearGradient>
-
-    <filter id="tvElevationBan" x="-20%" y="-20%" width="140%" height="145%">
-      <feDropShadow dx="0" dy="24" stdDeviation="30" flood-color="#000000" flood-opacity="0.9"/>
-    </filter>
-
-    <filter id="banGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="80"/>
-    </filter>
-
-    <filter id="neonGlowBan" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="10" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <clipPath id="screenClipBan">
-      <rect x="70" y="86" width="372" height="256" rx="16"/>
-    </clipPath>
   </defs>
 
-  <rect width="1920" height="1080" fill="url(#banBg)"/>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect width="1280" height="720" fill="url(#glow)"/>
 
-  <circle cx="480" cy="540" r="480" fill="#00F0FF" opacity="0.14" filter="url(#banGlow)"/>
-  <circle cx="1400" cy="500" r="460" fill="#7C4DFF" opacity="0.1" filter="url(#banGlow)"/>
-
-  <g transform="translate(140, 200) scale(1.35)" filter="url(#tvElevationBan)">
-    <path d="M244 358 L244 388 L268 388 L268 358 Z" fill="#2D374D"/>
-    <path d="M172 388 C172 384 176 382 184 382 L328 382 C336 382 340 384 340 388 L346 395 C346 398 342 400 334 400 L178 400 C170 400 166 398 166 395 Z" 
-          fill="#2D374D" stroke="#3E4E6E" stroke-width="1.2"/>
-    <line x1="184" y1="384" x2="328" y2="384" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
-
-    <rect x="54" y="70" width="404" height="288" rx="26" fill="url(#tvBezelBan)" stroke="#4A5C7E" stroke-width="2"/>
-    <rect x="68" y="84" width="376" height="260" rx="18" fill="#080C14" stroke="#1C2436" stroke-width="1.2"/>
-
-    <g clip-path="url(#screenClipBan)">
-      <rect x="70" y="86" width="372" height="256" rx="16" fill="url(#tvScreenBan)"/>
-
-      <circle cx="256" cy="260" r="110" fill="#00F5FF" opacity="0.25" filter="url(#neonGlowBan)"/>
-      <circle cx="256" cy="210" r="90" fill="#9333EA" opacity="0.28" filter="url(#neonGlowBan)"/>
-
-      <path d="M138 238 C166 170 208 136 256 136 C304 136 346 170 374 238" 
-            fill="none" stroke="url(#banAccent)" stroke-width="8" stroke-linecap="round" opacity="0.45"/>
-      <path d="M170 250 C192 196 222 168 256 168 C290 168 320 196 342 250" 
-            fill="none" stroke="url(#banAccent)" stroke-width="10" stroke-linecap="round" opacity="0.8" filter="url(#neonGlowBan)"/>
-      <path d="M202 262 C216 224 234 202 256 202 C278 202 296 224 310 262" 
-            fill="none" stroke="url(#banAccent)" stroke-width="12" stroke-linecap="round" filter="url(#neonGlowBan)"/>
-
-      <g filter="url(#neonGlowBan)">
-        <path d="M256 208 L320 298 C326 307 319 316 308 316 L204 316 C193 316 186 307 192 298 Z" 
-              fill="url(#banAccent)"/>
-        <path d="M256 218 L300 284 C304 290 300 295 294 295 L218 295 C212 295 208 290 212 284 Z" 
-              fill="#FFFFFF" opacity="0.32"/>
-      </g>
-
-      <rect x="70" y="86" width="372" height="256" rx="16" fill="url(#glassBan)"/>
-    </g>
-
-    <circle cx="256" cy="345" r="3.2" fill="#00F5FF" filter="url(#neonGlowBan)"/>
-    <circle cx="256" cy="345" r="1.4" fill="#FFFFFF"/>
+  <!-- Mark -->
+  <g transform="translate(180,170) scale(1.15)">
+    <rect x="40" y="60" width="280" height="176" rx="26" fill="#243A48"/>
+    <rect x="54" y="74" width="252" height="148" rx="14" fill="url(#screen)"/>
+    <circle cx="180" cy="140" r="48" fill="#3DDCFF" opacity="0.16"/>
+    <path d="M108 210 C130 164 152 140 180 140 C208 140 230 164 252 210"
+          fill="none" stroke="#3DDCFF" stroke-width="10" stroke-linecap="round" opacity="0.55"/>
+    <path d="M124 218 C142 184 158 166 180 166 C202 166 218 184 236 218"
+          fill="none" stroke="#3DDCFF" stroke-width="11" stroke-linecap="round" opacity="0.8"/>
+    <path d="M142 226 C154 204 164 192 180 192 C196 192 206 204 218 226"
+          fill="none" stroke="#3DDCFF" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="180" cy="234" r="11" fill="#FFC857"/>
+    <rect x="168" y="246" width="24" height="26" rx="3" fill="#2A4558"/>
+    <path d="M118 272 H242 C248 272 252 276 252 280 L248 290 C247 293 244 296 240 296 H120 C116 296 113 293 112 290 L108 280 C108 276 112 272 118 272 Z" fill="#3A5568"/>
   </g>
 
-  <g transform="translate(900, 310)">
-    <text x="0" y="110" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
-          font-size="118" font-weight="900" fill="#FFFFFF" letter-spacing="-2">AirPlay <tspan fill="url(#banAccent)">TV</tspan></text>
-    
-    <text x="0" y="185" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
-          font-size="40" font-weight="500" fill="#94A3B8" letter-spacing="0.2">High-Performance AirPlay Receiver for Android TV</text>
-
-    <g transform="translate(0, 260)">
-      <rect x="0" y="0" width="260" height="58" rx="29" fill="#162033" stroke="#2E3D59" stroke-width="1.5"/>
-      <text x="130" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="700" fill="#00F0FF" text-anchor="middle">⚡ 4K60 Mirroring</text>
-
-      <rect x="290" y="0" width="290" height="58" rx="29" fill="#162033" stroke="#2E3D59" stroke-width="1.5"/>
-      <text x="435" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="700" fill="#38BDF8" text-anchor="middle">🎵 Google Oboe Audio</text>
-    </g>
-
-    <g transform="translate(0, 340)">
-      <rect x="0" y="0" width="280" height="58" rx="29" fill="#162033" stroke="#2E3D59" stroke-width="1.5"/>
-      <text x="140" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="700" fill="#C084FC" text-anchor="middle">🎮 D-Pad 10-Foot UI</text>
-
-      <rect x="310" y="0" width="270" height="58" rx="29" fill="#162033" stroke="#2E3D59" stroke-width="1.5"/>
-      <text x="445" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="22" font-weight="700" fill="#00E676" text-anchor="middle">🛡️ Open Source GPLv3</text>
-    </g>
-  </g>
+  <text x="620" y="340" fill="#F2F7FA" font-family="DejaVu Sans, Arial, sans-serif" font-size="72" font-weight="700">AirPlay TV</text>
+  <rect x="620" y="360" width="110" height="6" rx="3" fill="#3DDCFF"/>
+  <text x="620" y="410" fill="#A8B8C4" font-family="DejaVu Sans, Arial, sans-serif" font-size="28">Cast • Mirror • Stream</text>
 </svg>

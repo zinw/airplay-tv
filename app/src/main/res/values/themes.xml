@@ -5,5 +5,24 @@
         <item name="android:windowBackground">@color/tv_bg_dark</item>
         <item name="colorPrimary">@color/tv_accent</item>
         <item name="colorAccent">@color/tv_accent</item>
+        <item name="colorControlActivated">@color/tv_accent</item>
+        <item name="android:colorFocusedHighlight">@color/tv_accent_dim</item>
+        <item name="android:textColorPrimary">@color/tv_text_primary</item>
+        <item name="android:textColorSecondary">@color/tv_text_secondary</item>
+        <item name="alertDialogTheme">@style/Theme.AirPlayTV.Dialog</item>
+    </style>
+
+    <style name="Theme.AirPlayTV.Dialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:background">@color/tv_card_bg</item>
+        <item name="colorAccent">@color/tv_accent</item>
+        <item name="android:textColorPrimary">@color/tv_text_primary</item>
+        <item name="android:textColor">@color/tv_text_primary</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.AirPlayTV.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.AirPlayTV.DialogButton</item>
+    </style>
+
+    <style name="Widget.AirPlayTV.DialogButton" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+        <item name="android:textColor">@color/tv_accent</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

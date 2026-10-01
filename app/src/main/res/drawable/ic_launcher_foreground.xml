@@ -6,81 +6,70 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- TV Stand Column -->
+    <!-- TV bezel -->
     <path
-        android:pathData="M52.5,70 L55.5,70 L55.5,74.5 L52.5,74.5 Z"
-        android:fillColor="#FF2D374D" />
+        android:pathData="M27,33 C24.8,33 23,34.8 23,37 L23,65 C23,67.2 24.8,69 27,69 L81,69 C83.2,69 85,67.2 85,65 L85,37 C85,34.8 83.2,33 81,33 Z"
+        android:fillColor="#FF243A48" />
 
-    <!-- TV Stand Base Pedestal -->
-    <path
-        android:pathData="M43,74.5 C43,73.8 44,73.5 45.5,73.5 L62.5,73.5 C64,73.5 65,73.8 65,74.5 L66,76 C66,76.5 65.5,77 64,77 L44,77 C42.5,77 42,76.5 42,76 Z"
-        android:fillColor="#FF3A4765" />
-
-    <!-- TV Outer Bezel Frame -->
-    <path
-        android:pathData="M26,30 C23.8,30 22,31.8 22,34 L22,66 C22,68.2 23.8,70 26,70 L82,70 C84.2,70 86,68.2 86,66 L86,34 C86,31.8 84.2,30 82,30 Z"
-        android:fillColor="#FF222C40"
-        android:strokeColor="#FF4A5C7E"
-        android:strokeWidth="1" />
-
-    <!-- TV Screen Panel Background -->
-    <path
-        android:pathData="M27.5,32.5 C26,32.5 25,33.5 25,35 L25,64.5 C25,66 26,67 27.5,67 L80.5,67 C82,67 83,66 83,64.5 L83,35 C83,33.5 82,32.5 80.5,32.5 Z">
+    <!-- Screen -->
+    <path android:pathData="M28.5,35.5 L79.5,35.5 L79.5,66.5 L28.5,66.5 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:startX="54"
-                android:startY="32"
+                android:startY="35"
                 android:endX="54"
                 android:endY="67"
                 android:type="linear">
-                <item android:color="#FF162035" android:offset="0.0"/>
-                <item android:color="#FF0D1322" android:offset="0.6"/>
-                <item android:color="#FF080C16" android:offset="1.0"/>
+                <item android:color="#FF152836" android:offset="0.0" />
+                <item android:color="#FF0A161E" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- TV Screen Radiant Cast Waves (AirPlay Pulse) -->
-    <!-- Wave 3 (Outer) -->
-    <path
-        android:pathData="M38,54 C42,44 47.5,39 54,39 C60.5,39 66,44 70,54"
-        android:strokeWidth="1.6"
-        android:strokeColor="#6600F5FF"
-        android:strokeLineCap="round" />
-
-    <!-- Wave 2 (Middle) -->
-    <path
-        android:pathData="M42.5,56 C45.5,48 49.5,43.5 54,43.5 C58.5,43.5 62.5,48 65.5,56"
-        android:strokeWidth="2.0"
-        android:strokeColor="#B300F5FF"
-        android:strokeLineCap="round" />
-
-    <!-- Wave 1 (Inner) -->
-    <path
-        android:pathData="M47,58 C49,52.5 51.5,48.5 54,48.5 C56.5,48.5 59,52.5 61,58"
-        android:strokeWidth="2.4"
-        android:strokeColor="#FF00F5FF"
-        android:strokeLineCap="round" />
-
-    <!-- AirPlay Triangle -->
-    <path
-        android:pathData="M54,49 L63,62.5 C63.8,63.8 62.8,65 61.5,65 L46.5,65 C45.2,65 44.2,63.8 45,62.5 Z">
+    <!-- Soft screen glow -->
+    <path android:pathData="M54,48m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="45"
-                android:startY="65"
-                android:endX="63"
-                android:endY="49"
-                android:type="linear">
-                <item android:color="#FF00F5FF" android:offset="0.0"/>
-                <item android:color="#FF0077FE" android:offset="0.5"/>
-                <item android:color="#FF9333EA" android:offset="1.0"/>
+                android:centerX="54"
+                android:centerY="46"
+                android:gradientRadius="12"
+                android:type="radial">
+                <item android:color="#553DDCFF" android:offset="0.0" />
+                <item android:color="#00000000" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- TV Power Indicator LED -->
+    <!-- Inbound cast arcs (receiver, not Apple triangle) -->
     <path
-        android:pathData="M54,68.5m-0.8,0a0.8,0.8 0,1 1,1.6 0a0.8,0.8 0,1 1,-1.6 0"
-        android:fillColor="#FF00F5FF" />
+        android:pathData="M40,60 C44,50 49,45 54,45 C59,45 64,50 68,60"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FF3DDCFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M44,61.5 C47,54.5 50.2,50.5 54,50.5 C57.8,50.5 61,54.5 64,61.5"
+        android:strokeWidth="2.4"
+        android:strokeColor="#CC3DDCFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M48,63 C50,58.5 51.8,55.5 54,55.5 C56.2,55.5 58,58.5 60,63"
+        android:strokeWidth="2.6"
+        android:strokeColor="#FF3DDCFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Receiver node -->
+    <path
+        android:pathData="M54,64.5m-2.2,0a2.2,2.2 0,1 1,4.4 0a2.2,2.2 0,1 1,-4.4 0"
+        android:fillColor="#FFFFC857" />
+
+    <!-- Stand -->
+    <path
+        android:pathData="M52.2,69 L55.8,69 L55.8,74 L52.2,74 Z"
+        android:fillColor="#FF2A4558" />
+    <path
+        android:pathData="M43,74 L65,74 C66.2,74 67,74.8 67,75.6 L66.2,77.2 C66,77.7 65.4,78 64.6,78 L43.4,78 C42.6,78 42,77.7 41.8,77.2 L41,75.6 C41,74.8 41.8,74 43,74 Z"
+        android:fillColor="#FF3A5568" />
 </vector>

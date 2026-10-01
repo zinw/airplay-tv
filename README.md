@@ -25,8 +25,8 @@ An open-source, high-performance AirPlay receiver tailored specifically for **An
 
 | Ambient Home Screen | TV Settings Modal |
 | :---: | :---: |
-| <img src="docs/screenshots/ambient_home.png" width="480" /> | <img src="docs/screenshots/settings_overlay.png" width="480" /> |
-| *Ready to connect guide with real-time mDNS status* | *D-Pad navigable settings with hot-reload* |
+| <img src="docs/screenshots/ambient_home_refresh.jpg" width="480" /> | <img src="docs/screenshots/settings_overlay_refresh.jpg" width="480" /> |
+| *Ready to connect with status chips for PIN, language, and updates* | *D-Pad navigable settings with hot-reload* |
 
 | Screen Mirroring | HLS Web Video Player | Music & Visualizer |
 | :---: | :---: | :---: |

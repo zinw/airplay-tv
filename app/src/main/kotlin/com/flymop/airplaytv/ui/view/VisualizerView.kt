@@ -60,8 +60,8 @@ class VisualizerView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         shader = LinearGradient(
             0f, h.toFloat(), 0f, 0f,
-            Color.parseColor("#00E5FF"),
-            Color.parseColor("#7C4DFF"),
+            Color.parseColor("#3DDCFF"),
+            Color.parseColor("#FFC857"),
             Shader.TileMode.CLAMP
         )
         paint.shader = shader
