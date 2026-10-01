@@ -60,6 +60,17 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`
 ```bash
 ./gradlew assembleRelease
 ```
+
+Debug and release both sign with the committed keystore at
+`keystore/airplaytv-upload.keystore` (see `keystore/README.md`). Do **not** rely on
+`~/.android/debug.keystore` — that caused v1.0.1 / v1.0.2 / v1.0.3 to each ship a
+different cert and blocked USB/OTA overlays.
+
+### Upgrade / signing
+- **1.0.4+ → later 1.0.x**: `adb install -r` / in-app OTA should work (same upload key).
+- **1.0.1 / 1.0.2 / 1.0.3 → 1.0.4**: uninstall once first; those Releases used three
+  different ephemeral Android Debug certs and cannot match the new key.
+
 Outputs (generated in `app/build/outputs/apk/release/`):
 - `app-armeabi-v7a-release.apk`: Lightweight build for 32-bit ARM TVs & TV sticks (~13 MB)
 - `app-arm64-v8a-release.apk`: Lightweight build for 64-bit ARM TVs & Shields (~17 MB)
