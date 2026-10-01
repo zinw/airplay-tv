@@ -5,19 +5,20 @@ import java.nio.ByteBuffer
 /**
  * Annex-B NAL helpers for mirror recovery.
  *
- * Important: SPS/PPS/VPS alone are **not** a safe decode restart point.
- * Treating them as keyframes lets P-frames land on an empty reference list
- * and produces mosaic / stale-tile corruption on HW decoders (Honor etc.).
+ * Important: SPS/PPS/VPS alone are **not** a safe decode restart point for coded
+ * slices, but they **must still be fed** to MediaCodec while awaiting IDR — AirPlay
+ * often sends parameter sets in a separate AU before the IDR. Dropping them leaves
+ * the decoder without CSD and yields a black Surface.
  */
 object VideoNalUtils {
 
-    /** True if the access unit contains an IDR (AVC) or IDR/CRA (HEVC). */
+    /** True if the access unit contains an IDR (AVC) or IRAP IDR/CRA/BLA (HEVC). */
     fun containsIdr(data: ByteBuffer, size: Int, isH265: Boolean): Boolean {
         forEachNalHeader(data, size) { header ->
             if (isH265) {
                 val type = (header shr 1) and 0x3F
-                // 19 IDR_W_RADL, 20 IDR_N_LP, 21 CRA_NUT (common AirPlay recovery)
-                if (type in 19..21) return true
+                // 16–18 BLA, 19–20 IDR, 21 CRA — all clean random-access points
+                if (type in 16..21) return true
             } else {
                 val type = header and 0x1F
                 if (type == 5) return true // IDR slice
@@ -26,7 +27,7 @@ object VideoNalUtils {
         return false
     }
 
-    /** Parameter sets only — useful for logging, not for clearing await-IDR. */
+    /** Parameter sets — feed while awaiting IDR; do not clear the await gate alone. */
     fun containsParamSets(data: ByteBuffer, size: Int, isH265: Boolean): Boolean {
         forEachNalHeader(data, size) { header ->
             if (isH265) {
@@ -39,6 +40,13 @@ object VideoNalUtils {
         }
         return false
     }
+
+    /**
+     * Safe to enqueue while [awaitingIdr]: real IDR/IRAP, or parameter-set AUs that
+     * must reach the decoder before the recovery frame.
+     */
+    fun isRecoverableInput(data: ByteBuffer, size: Int, isH265: Boolean): Boolean =
+        containsIdr(data, size, isH265) || containsParamSets(data, size, isH265)
 
     private inline fun forEachNalHeader(data: ByteBuffer, size: Int, block: (header: Int) -> Unit) {
         if (size < 4) return

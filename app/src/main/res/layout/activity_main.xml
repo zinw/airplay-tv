@@ -103,7 +103,7 @@
                     android:textColor="@color/tv_text_secondary"
                     android:textSize="13sp"
                     android:textStyle="bold"
-                    tools:text="Version 1.0.3 (4)" />
+                    tools:text="Version 1.0.4 (5)" />
 
             </LinearLayout>
             <!--
@@ -605,7 +605,7 @@
                         android:text="@string/app_version_label"
                         android:textColor="@color/tv_text_muted"
                         android:textSize="13sp"
-                        tools:text="Version 1.0.3 (4)" />
+                        tools:text="Version 1.0.4 (5)" />
 
                 </LinearLayout>
 

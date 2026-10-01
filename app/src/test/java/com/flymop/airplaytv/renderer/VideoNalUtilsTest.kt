@@ -11,9 +11,19 @@ class VideoNalUtilsTest {
         val spsOnly = annexB(byteArrayOf(0x67.toByte(), 0x42, 0x00, 0x0A)) // type 7 SPS
         assertFalse(VideoNalUtils.containsIdr(spsOnly, spsOnly.capacity(), isH265 = false))
         assertTrue(VideoNalUtils.containsParamSets(spsOnly, spsOnly.capacity(), isH265 = false))
+        assertTrue(VideoNalUtils.isRecoverableInput(spsOnly, spsOnly.capacity(), isH265 = false))
 
         val idr = annexB(byteArrayOf(0x65.toByte(), 0x88.toByte(), 0x84.toByte())) // type 5 IDR
         assertTrue(VideoNalUtils.containsIdr(idr, idr.capacity(), isH265 = false))
+        assertTrue(VideoNalUtils.isRecoverableInput(idr, idr.capacity(), isH265 = false))
+    }
+
+    @Test
+    fun avc_p_slice_not_recoverable_while_awaiting_idr() {
+        val pSlice = annexB(byteArrayOf(0x41, 0x9A.toByte())) // type 1 non-IDR
+        assertFalse(VideoNalUtils.containsIdr(pSlice, pSlice.capacity(), isH265 = false))
+        assertFalse(VideoNalUtils.containsParamSets(pSlice, pSlice.capacity(), isH265 = false))
+        assertFalse(VideoNalUtils.isRecoverableInput(pSlice, pSlice.capacity(), isH265 = false))
     }
 
     @Test
@@ -27,6 +37,7 @@ class VideoNalUtilsTest {
         au.clear()
         assertTrue(VideoNalUtils.containsIdr(au, size, isH265 = false))
         assertTrue(VideoNalUtils.containsParamSets(au, size, isH265 = false))
+        assertTrue(VideoNalUtils.isRecoverableInput(au, size, isH265 = false))
     }
 
     @Test
@@ -34,9 +45,13 @@ class VideoNalUtilsTest {
         val vps = annexB(byteArrayOf(0x40, 0x01)) // type 32 VPS ((0x40>>1)&0x3F == 32)
         assertFalse(VideoNalUtils.containsIdr(vps, vps.capacity(), isH265 = true))
         assertTrue(VideoNalUtils.containsParamSets(vps, vps.capacity(), isH265 = true))
+        assertTrue(VideoNalUtils.isRecoverableInput(vps, vps.capacity(), isH265 = true))
 
         val idr = annexB(byteArrayOf(0x26, 0x01)) // type 19 IDR_W_RADL
         assertTrue(VideoNalUtils.containsIdr(idr, idr.capacity(), isH265 = true))
+
+        val bla = annexB(byteArrayOf(0x20, 0x01)) // type 16 BLA_W_LP
+        assertTrue(VideoNalUtils.containsIdr(bla, bla.capacity(), isH265 = true))
     }
 
     private fun annexB(nal: ByteArray): ByteBuffer {

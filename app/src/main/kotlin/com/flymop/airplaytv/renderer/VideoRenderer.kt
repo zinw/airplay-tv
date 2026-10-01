@@ -6,6 +6,7 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import com.flymop.airplaytv.renderer.DecoderSelector.Companion.videoCaps
@@ -31,15 +32,20 @@ class VideoRenderer(ctx: Context) {
     private var videoHeight = 0
     private var firstFrameQueued = false
     /**
-     * After flush/start/drop-desync, discard non-IDR input until the next IDR/CRA.
-     * SPS/PPS alone must not clear this — that produces mosaic tiles on HW decoders.
+     * After flush/start/drop-desync, discard non-IDR coded slices until the next IDR/CRA.
+     * Parameter-set AUs (SPS/PPS/VPS) are still fed — dropping them causes black screens
+     * when AirPlay sends CSD separately from the IDR.
+     *
+     * Do **not** suppress Surface renders while waiting: that over-corrected mosaic into
+     * a fully black picture on Honor / OEM decoders (v1.0.3).
      */
     private var awaitingIdr = true
-    /** Drop Surface renders until the first output after a recovery IDR was queued. */
-    private val suppressRenderUntilKeyOutput = AtomicBoolean(true)
-    /** Set when an IDR was successfully queued while suppress was active. */
-    private val idrQueuedForRender = AtomicBoolean(false)
+    /** Wall-clock when we entered awaitingIdr; used for picture-first timeout escape. */
+    private var awaitingIdrSinceElapsedMs = 0L
+    /** Consecutive mid-GOP queue failures before forcing await-IDR (avoid one-drop blackout). */
+    private var consecutiveMidGopDrops = 0
     private var consecutiveCodecErrors = 0
+    private var loggedFirstFrame = false
     /** Bumped on soft flush for QA logcat correlation. */
     private val codecEpoch = AtomicInteger(0)
 
@@ -117,18 +123,18 @@ class VideoRenderer(ctx: Context) {
     // codec per mirror session; pipeline persists across sessions
     fun startSession() = synchronized(lock) {
         _resetStats()
+        loggedFirstFrame = false
         // Pre-create AVC decoder so the first IDR does not pay create+configure on the RTP thread.
         if (codec == null && videoWidth > 0 && videoHeight > 0 && avcDecoder != null) {
             try {
                 startCodec(h265 = false)
-                awaitingIdr = true
-                suppressRenderUntilKeyOutput.set(true)
-                idrQueuedForRender.set(false)
-                Log.i(TAG, "VIDEO_PREWARM AVC codec ahead of first IDR")
+                _enterAwaitIdr("VIDEO_PREWARM AVC codec ahead of first IDR")
             } catch (e: Exception) {
                 Log.w(TAG, "codec prewarm failed (will start on first IDR)", e)
                 stopCodec()
             }
+        } else {
+            _enterAwaitIdr("VIDEO_MIRROR_START awaiting IDR")
         }
     }
 
@@ -144,11 +150,8 @@ class VideoRenderer(ctx: Context) {
     fun flushSession() = synchronized(lock) {
         val c = codec
         if (c == null) {
-            awaitingIdr = true
-            suppressRenderUntilKeyOutput.set(true)
-            idrQueuedForRender.set(false)
             firstFrameQueued = false
-            Log.i(TAG, "VIDEO_FLUSH idle (awaiting IDR)")
+            _enterAwaitIdr("VIDEO_FLUSH idle (awaiting IDR)")
             return@synchronized
         }
         try {
@@ -159,9 +162,6 @@ class VideoRenderer(ctx: Context) {
             c.start()
             freeInputs.clear()
             firstFrameQueued = false
-            awaitingIdr = true
-            suppressRenderUntilKeyOutput.set(true)
-            idrQueuedForRender.set(false)
             consecutiveCodecErrors = 0
             synchronized(ptsLock) {
                 _ptsBaseUs = Long.MIN_VALUE
@@ -170,11 +170,27 @@ class VideoRenderer(ctx: Context) {
             _frameIntervalIdx = 0
             _frameIntervalCount = 0
             _lastOutputFrameNs = 0L
-            Log.i(TAG, "VIDEO_FLUSH soft+start epoch=$epoch (awaiting IDR, suppress render)")
+            _enterAwaitIdr("VIDEO_FLUSH soft+start epoch=$epoch (awaiting IDR; render not suppressed)")
         } catch (e: Exception) {
             Log.w(TAG, "VIDEO_FLUSH soft failed; hard restart", e)
             stopCodec()
         }
+    }
+
+    private fun _enterAwaitIdr(reason: String) {
+        awaitingIdr = true
+        awaitingIdrSinceElapsedMs = SystemClock.elapsedRealtime()
+        consecutiveMidGopDrops = 0
+        Log.i(TAG, reason)
+    }
+
+    private fun _clearAwaitIdr(reason: String) {
+        if (awaitingIdr) {
+            Log.i(TAG, reason)
+        }
+        awaitingIdr = false
+        awaitingIdrSinceElapsedMs = 0L
+        consecutiveMidGopDrops = 0
     }
 
     private fun _resetStats() {
@@ -220,18 +236,28 @@ class VideoRenderer(ctx: Context) {
             if (videoWidth == 0 || videoHeight == 0) return
 
             val isIdr = VideoNalUtils.containsIdr(nativeInputBuffer, size, isH265)
+            val isParam = VideoNalUtils.containsParamSets(nativeInputBuffer, size, isH265)
+            val recoverable = isIdr || isParam
+
+            // Picture-first escape: if we waited too long for IDR, resume feeding so the
+            // Surface is not stuck black (occasional mosaic preferred over no picture).
+            if (awaitingIdr && !isIdr && awaitingIdrSinceElapsedMs > 0) {
+                val waited = SystemClock.elapsedRealtime() - awaitingIdrSinceElapsedMs
+                if (waited >= AWAIT_IDR_TIMEOUT_MS) {
+                    _clearAwaitIdr("VIDEO_AWAIT_IDR_TIMEOUT after ${waited}ms — resume feed (picture first)")
+                }
+            }
 
             if (codec == null || isH265 != currentH265) {
-                // Stale P-frames without IDR decode to mosaic — wait for IDR to (re)start.
-                if (!isIdr) {
-                    if (codec != null) {
-                        Log.i(TAG, "VIDEO_AWAIT_IDR codec restart (non-IDR while codec mismatch/null)")
-                        stopCodec()
+                // Restart needs IDR or at least param sets to seed CSD before IDR.
+                if (!recoverable) {
+                    if (codec != null && isH265 != currentH265) {
+                        Log.i(TAG, "VIDEO_AWAIT_IDR codec switch (non-recovery while mime mismatch)")
                     }
                     return
                 }
-                stopCodec()
-            } else if (awaitingIdr && !isIdr) {
+                if (codec != null) stopCodec()
+            } else if (awaitingIdr && !recoverable) {
                 return
             }
 
@@ -239,23 +265,22 @@ class VideoRenderer(ctx: Context) {
                 if (codec == null) startCodec(isH265)
                 val queued = _feedToCodec(size, ntpTimeNs, isIdr)
                 if (queued && isIdr) {
-                    if (awaitingIdr) {
-                        Log.i(TAG, "VIDEO_IDR_RESUME size=$size h265=$isH265")
-                    }
-                    awaitingIdr = false
-                    idrQueuedForRender.set(true)
+                    _clearAwaitIdr("VIDEO_IDR_RESUME size=$size h265=$isH265")
                     consecutiveCodecErrors = 0
+                } else if (queued && isParam && awaitingIdr) {
+                    Log.i(TAG, "VIDEO_FEED_PARAMSET size=$size h265=$isH265 (still awaiting IDR)")
                 } else if (!queued && !isIdr && !awaitingIdr) {
-                    // Dropping a mid-GOP frame breaks references until the next IDR.
-                    awaitingIdr = true
-                    suppressRenderUntilKeyOutput.set(true)
-                    idrQueuedForRender.set(false)
-                    Log.w(
-                        TAG,
-                        "VIDEO_DROP_DESYNC mid-GOP drop → awaiting IDR (drops=$droppedFrames)",
-                    )
+                    consecutiveMidGopDrops++
+                    // Require a few failures — a single drop under load should not blank the screen.
+                    if (consecutiveMidGopDrops >= MID_GOP_DROP_THRESHOLD) {
+                        _enterAwaitIdr(
+                            "VIDEO_DROP_DESYNC mid-GOP drops=$consecutiveMidGopDrops → awaiting IDR",
+                        )
+                    }
                 } else if (!queued && isIdr) {
                     Log.w(TAG, "VIDEO_DROP_IDR failed to queue recovery frame (drops=$droppedFrames)")
+                } else if (queued) {
+                    consecutiveMidGopDrops = 0
                 }
                 Unit
             } catch (e: Exception) {
@@ -320,8 +345,8 @@ class VideoRenderer(ctx: Context) {
 
         firstFrameQueued = false
         awaitingIdr = true
-        suppressRenderUntilKeyOutput.set(true)
-        idrQueuedForRender.set(false)
+        awaitingIdrSinceElapsedMs = SystemClock.elapsedRealtime()
+        consecutiveMidGopDrops = 0
         freeInputs.clear()
         try {
             _startWithLadder(info, mime, s, h265)
@@ -403,19 +428,16 @@ class VideoRenderer(ctx: Context) {
             }
             try {
                 val isConfig = (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
-                // Discard outputs until the first decoded frame after a recovery IDR was queued.
-                // Do not rely on BUFFER_FLAG_KEY_FRAME on output — some OEM decoders omit it.
                 if (isConfig) {
                     codec.releaseOutputBuffer(index, false)
                     return
                 }
-                if (suppressRenderUntilKeyOutput.get()) {
-                    if (!idrQueuedForRender.get()) {
-                        codec.releaseOutputBuffer(index, false)
-                        return
-                    }
-                    suppressRenderUntilKeyOutput.set(false)
-                    Log.i(TAG, "VIDEO_KEY_OUTPUT resume render ptsUs=${info.presentationTimeUs}")
+
+                // Always render decoded frames. v1.0.3 suppressed until post-IDR output and
+                // produced a fully black mirror when IDR/CSD gating never completed.
+                if (!loggedFirstFrame) {
+                    loggedFirstFrame = true
+                    Log.i(TAG, "VIDEO_FIRST_FRAME ptsUs=${info.presentationTimeUs}")
                 }
 
                 _recordOutputFrameTime()
@@ -463,8 +485,8 @@ class VideoRenderer(ctx: Context) {
         }
         firstFrameQueued = false
         awaitingIdr = true
-        suppressRenderUntilKeyOutput.set(true)
-        idrQueuedForRender.set(false)
+        awaitingIdrSinceElapsedMs = SystemClock.elapsedRealtime()
+        consecutiveMidGopDrops = 0
         codec?.let {
             try { it.stop() } catch (_: Exception) {}
             try { it.setCallback(null) } catch (_: Exception) {}
@@ -521,5 +543,9 @@ class VideoRenderer(ctx: Context) {
         /** IDR recovery on slow OEM decoders — slightly more patient than mid-GOP. */
         private const val IDR_FEED_POLL_MS = 1L
         private const val IDR_FEED_RETRIES = 40
+        /** Prefer picture over indefinite black if IDR never arrives. */
+        private const val AWAIT_IDR_TIMEOUT_MS = 1_200L
+        /** Single queue-full under load must not blank the mirror. */
+        private const val MID_GOP_DROP_THRESHOLD = 3
     }
 }
