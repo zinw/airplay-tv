@@ -52,6 +52,7 @@
     <string name="setting_language_desc">App display language</string>
     <string name="language_english">English</string>
     <string name="language_zh_cn">简体中文</string>
+    <string name="language_system">System</string>
     <string name="fps_value">%1$d FPS</string>
     <string name="resolution_auto">Auto</string>
 
@@ -67,8 +68,14 @@
     <string name="update_later">Later</string>
     <string name="update_downloading">Downloading update…</string>
     <string name="update_download_progress">Downloading update… %1$d%%</string>
+    <string name="update_download_progress_via">Downloading via %1$s… %2$d%%</string>
+    <string name="update_download_retrying">Retrying download… (%1$d)</string>
     <string name="update_installing">Opening installer…</string>
     <string name="update_failed">Update failed. Try again later.</string>
+    <string name="update_failed_title">Update failed</string>
+    <string name="update_failed_message">Could not download a valid APK.\n\n%1$s</string>
+    <string name="update_retry">Retry</string>
+    <string name="update_cancel">Cancel</string>
     <string name="update_install_permission_required">Allow installing apps from AirPlay TV to continue the update.</string>
     <string name="update_install_permission_denied">Install permission was not granted. Update cancelled.</string>
 

@@ -26,7 +26,7 @@ An open-source, high-performance AirPlay receiver tailored specifically for **An
 | Ambient Home Screen | TV Settings Modal |
 | :---: | :---: |
 | <img src="docs/screenshots/ambient_home_refresh.jpg" width="480" /> | <img src="docs/screenshots/settings_overlay_refresh.jpg" width="480" /> |
-| *Ready to connect with status chips for PIN, language, and updates* | *D-Pad navigable settings with hot-reload* |
+| *Ready to connect with D-pad focusable Settings / language / PIN* | *D-Pad navigable settings with hot-reload* |
 
 | Screen Mirroring | HLS Web Video Player | Music & Visualizer |
 | :---: | :---: | :---: |
@@ -194,15 +194,23 @@ For full details on Wireless ADB setup, logcat filtering, Performance HUD diagno
 
 On cold start the app queries the public GitHub Releases API for [`zinw/airplay-tv`](https://github.com/zinw/airplay-tv/releases/latest). If a newer build is found, a confirm dialog is shown; only after the user accepts does the app download the release APK and hand it to the system package installer. Offline / rate-limit failures are soft (logged, never crash or block the home screen).
 
+Downloads try **GitHub first**, then public prefix mirrors with backoff (for flaky access from some regions, including China mainland):
+
+1. `https://github.com/.../releases/download/...` (primary)
+2. `https://ghproxy.net/https://github.com/.../releases/download/...`
+3. `https://ghfast.top/https://github.com/.../releases/download/...`
+
+(`mirror.ghproxy.com` was probed and is currently omitted.) Progress shows the active source; failures show a reason plus **Retry** / **Cancel**, and the APK is size-checked (GitHub asset size / Content-Length) plus ZIP magic before the installer is launched so truncated files do not surface as 「应用未安装」.
+
 ### How to publish a test release the updater can see
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. Build an APK, e.g. `./gradlew assembleDebug` or `./gradlew assembleRelease`.
 3. Create a **non-draft** GitHub Release on `zinw/airplay-tv`:
-   - **Tag** (required for name compare): `v{versionName}` such as `v1.0.1`.
-   - **Preferred for versionCode compare**: put a line `versionCode: N` in the release body (same `N` as `app/build.gradle.kts`), **or** use tag metadata `v1.0.1+N`.
+   - **Tag** (required for name compare): `v{versionName}` such as `v1.0.3`.
+   - **Preferred for versionCode compare**: put a line `versionCode: N` in the release body (same `N` as `app/build.gradle.kts`), **or** use tag metadata `v1.0.3+N`.
    - **Attach** a clearly named `.apk` asset, for example:
-     - `app-debug.apk` / `app-universal-release.apk`, or
+     - `AirPlayTV-1.0.3-universal.apk`, or
      - ABI-specific names containing `arm64-v8a`, `armeabi-v7a`, `x86_64`, or `universal` (the app prefers the device ABI, then universal).
 4. Publish the release. Relaunch the installed older build on the TV; it should prompt once per process start.
 
