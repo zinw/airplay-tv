@@ -118,6 +118,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         setupSurfaceView()
         setupSettings()
         refreshHomeMeta()
+        bindVersionLabels()
         startAndBindService()
         maybeCheckForUpdate()
     }
@@ -146,33 +147,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
-    private fun currentVersionLabel(): String {
+    private fun currentVersion(): Pair<String, Long> {
         return try {
-            val pkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getPackageInfo(packageName, 0)
-            }
-            pkg.versionName ?: "1.0.0"
-        } catch (_: Exception) {
-            "1.0.0"
-        }
-    }
-
-    private fun refreshHomeMeta() {
-        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-        binding.btnPinHome.setText(
-            if (Prefs.isRequirePin(prefs)) R.string.home_pin_on else R.string.home_pin_off
-        )
-        binding.btnLanguageHome.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
-        if (binding.tvUpdateStatus.text.isNullOrBlank()) {
-            binding.tvUpdateStatus.text = getString(R.string.home_update_unknown, currentVersionLabel())
-        }
-    }
-
-    private fun showUpdateAvailableDialog(update: AppUpdateChecker.AvailableUpdate) {
-        val currentLabel = try {
             val pkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
             } else {
@@ -185,10 +161,44 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 @Suppress("DEPRECATION")
                 pkg.versionCode.toLong()
             }
-            "${pkg.versionName ?: "?"} ($code)"
+            (pkg.versionName ?: "1.0.0") to code
         } catch (_: Exception) {
-            "?"
+            "1.0.0" to 0L
         }
+    }
+
+    /** Short form used in update status lines, e.g. `1.0.3 (4)`. */
+    private fun currentVersionLabel(): String {
+        val (name, code) = currentVersion()
+        return getString(R.string.app_version_short, name, code)
+    }
+
+    /** Localized label for home chip / settings header, e.g. `Version 1.0.3 (4)`. */
+    private fun currentVersionDisplay(): String {
+        val (name, code) = currentVersion()
+        return getString(R.string.app_version_label, name, code)
+    }
+
+    private fun bindVersionLabels() {
+        val label = currentVersionDisplay()
+        binding.tvAppVersion.text = label
+        binding.tvSettingsVersion.text = label
+    }
+
+    private fun refreshHomeMeta() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        binding.btnPinHome.setText(
+            if (Prefs.isRequirePin(prefs)) R.string.home_pin_on else R.string.home_pin_off
+        )
+        binding.btnLanguageHome.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        bindVersionLabels()
+        if (binding.tvUpdateStatus.text.isNullOrBlank()) {
+            binding.tvUpdateStatus.text = getString(R.string.home_update_unknown, currentVersionLabel())
+        }
+    }
+
+    private fun showUpdateAvailableDialog(update: AppUpdateChecker.AvailableUpdate) {
+        val currentLabel = currentVersionLabel()
 
         AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
             .setTitle(R.string.update_available_title)
@@ -410,6 +420,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
         binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
         binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        bindVersionLabels()
 
         binding.settingsOverlay.visibility = View.VISIBLE
         binding.rowSettingDeviceName.requestFocus()
