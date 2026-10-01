@@ -47,6 +47,18 @@
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
 
+    <!-- In-app update -->
+    <string name="update_available_title">Update Available</string>
+    <string name="update_available_message">A newer build (%1$s) is available.\nCurrent: %2$s\n\nDownload and install now?</string>
+    <string name="update_confirm">Update</string>
+    <string name="update_later">Later</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_download_progress">Downloading update… %1$d%%</string>
+    <string name="update_installing">Opening installer…</string>
+    <string name="update_failed">Update failed. Try again later.</string>
+    <string name="update_install_permission_required">Allow installing apps from AirPlay TV to continue the update.</string>
+    <string name="update_install_permission_denied">Install permission was not granted. Update cancelled.</string>
+
     <!-- Notification -->
     <string name="notification_channel">AirPlay Service</string>
     <string name="notification_title">AirPlay TV Running</string>

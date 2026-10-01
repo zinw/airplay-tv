@@ -13,6 +13,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +26,8 @@ import android.view.SurfaceHolder
 import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -33,6 +36,9 @@ import com.flymop.airplaytv.databinding.ActivityMainBinding
 import com.flymop.airplaytv.Prefs
 import com.flymop.airplaytv.service.AirPlayService
 import com.flymop.airplaytv.service.AirPlayService.ServerState
+import com.flymop.airplaytv.update.ApkInstaller
+import com.flymop.airplaytv.update.AppUpdateChecker
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
@@ -46,6 +52,22 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var isHudVisible = false
     private var currentPort = 7000
+    private var pendingInstallUpdate: AppUpdateChecker.AvailableUpdate? = null
+    private var updateDownloadJob: Job? = null
+    private var downloadProgressDialog: AlertDialog? = null
+
+    private val installPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val update = pendingInstallUpdate
+        pendingInstallUpdate = null
+        if (update == null) return@registerForActivityResult
+        if (ApkInstaller.canInstallPackages(this)) {
+            startDownloadAndInstall(update)
+        } else {
+            Toast.makeText(this, R.string.update_install_permission_denied, Toast.LENGTH_LONG).show()
+        }
+    }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -74,6 +96,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     companion object {
         private const val TAG = "MainActivity"
+        /** One GitHub Releases check per process (cold start). */
+        @Volatile private var updateCheckStartedThisProcess = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,6 +117,105 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         setupSurfaceView()
         setupSettings()
         startAndBindService()
+        maybeCheckForUpdate()
+    }
+
+    /** Soft fail: offline / rate-limit / parse errors never block the home screen. */
+    private fun maybeCheckForUpdate() {
+        if (updateCheckStartedThisProcess) return
+        updateCheckStartedThisProcess = true
+        lifecycleScope.launch {
+            val update = try {
+                AppUpdateChecker.check(this@MainActivity)
+            } catch (e: Exception) {
+                Log.i(TAG, "Update check skipped: ${e.message}")
+                null
+            } ?: return@launch
+            if (isFinishing || isDestroyed) return@launch
+            showUpdateAvailableDialog(update)
+        }
+    }
+
+    private fun showUpdateAvailableDialog(update: AppUpdateChecker.AvailableUpdate) {
+        val currentLabel = try {
+            val pkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0)
+            }
+            val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pkg.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                pkg.versionCode.toLong()
+            }
+            "${pkg.versionName ?: "?"} ($code)"
+        } catch (_: Exception) {
+            "?"
+        }
+
+        AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
+            .setTitle(R.string.update_available_title)
+            .setMessage(getString(R.string.update_available_message, update.versionLabel, currentLabel))
+            .setPositiveButton(R.string.update_confirm) { _, _ ->
+                confirmUpdateInstall(update)
+            }
+            .setNegativeButton(R.string.update_later, null)
+            .show()
+    }
+
+    private fun confirmUpdateInstall(update: AppUpdateChecker.AvailableUpdate) {
+        if (!ApkInstaller.canInstallPackages(this)) {
+            pendingInstallUpdate = update
+            Toast.makeText(this, R.string.update_install_permission_required, Toast.LENGTH_LONG).show()
+            installPermissionLauncher.launch(ApkInstaller.createUnknownSourcesIntent(this))
+            return
+        }
+        startDownloadAndInstall(update)
+    }
+
+    private fun startDownloadAndInstall(update: AppUpdateChecker.AvailableUpdate) {
+        updateDownloadJob?.cancel()
+        downloadProgressDialog?.dismiss()
+
+        val progressDialog = AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
+            .setTitle(R.string.update_available_title)
+            .setMessage(R.string.update_downloading)
+            .setCancelable(false)
+            .create()
+        downloadProgressDialog = progressDialog
+        progressDialog.show()
+
+        updateDownloadJob = lifecycleScope.launch {
+            try {
+                val apk = ApkInstaller.download(
+                    context = this@MainActivity,
+                    url = update.apkDownloadUrl,
+                    fileName = update.apkFileName,
+                ) { downloaded, total ->
+                    if (total > 0L) {
+                        val pct = ((downloaded * 100L) / total).toInt().coerceIn(0, 100)
+                        runOnUiThread {
+                            if (progressDialog.isShowing) {
+                                progressDialog.setMessage(getString(R.string.update_download_progress, pct))
+                            }
+                        }
+                    }
+                }
+                if (isFinishing || isDestroyed) return@launch
+                progressDialog.setMessage(getString(R.string.update_installing))
+                ApkInstaller.install(this@MainActivity, apk)
+            } catch (e: Exception) {
+                Log.w(TAG, "Update download/install failed", e)
+                if (!isFinishing && !isDestroyed) {
+                    Toast.makeText(this@MainActivity, R.string.update_failed, Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                if (progressDialog.isShowing) progressDialog.dismiss()
+                if (downloadProgressDialog === progressDialog) downloadProgressDialog = null
+            }
+        }
     }
 
     private fun setupSurfaceView() {
@@ -679,6 +802,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onDestroy() {
         super.onDestroy()
         mainHandler.removeCallbacks(hudUpdateRunnable)
+        updateDownloadJob?.cancel()
+        updateDownloadJob = null
+        downloadProgressDialog?.dismiss()
+        downloadProgressDialog = null
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false

@@ -47,6 +47,18 @@
     <string name="save">保存</string>
     <string name="cancel">取消</string>
 
+    <!-- In-app update -->
+    <string name="update_available_title">发现新版本</string>
+    <string name="update_available_message">有更新的构建（%1$s）可用。\n当前版本：%2$s\n\n是否立即下载并安装？</string>
+    <string name="update_confirm">更新</string>
+    <string name="update_later">稍后</string>
+    <string name="update_downloading">正在下载更新…</string>
+    <string name="update_download_progress">正在下载更新… %1$d%%</string>
+    <string name="update_installing">正在打开安装程序…</string>
+    <string name="update_failed">更新失败，请稍后再试。</string>
+    <string name="update_install_permission_required">请允许从此来源安装应用，以继续更新。</string>
+    <string name="update_install_permission_denied">未授予安装权限，已取消更新。</string>
+
     <!-- Notification -->
     <string name="notification_channel">AirPlay 服务</string>
     <string name="notification_title">AirPlay TV 运行中</string>
