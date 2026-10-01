@@ -525,6 +525,12 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     fun restartServer(name: String = Prefs.getServerName(prefs)) {
+        // Competitors (and UxPlay) tear down the live RTSP session before
+        // re-advertising; otherwise iOS can hang on a half-dead socket after
+        // rename / resolution / PIN toggles until the sender times out.
+        if (nativeHandle != 0L) {
+            NativeBridge.nativeDisconnectSessions(nativeHandle)
+        }
         stopServer(stopService = false)
         startServer(name, ensureServiceStarted = true)
     }
