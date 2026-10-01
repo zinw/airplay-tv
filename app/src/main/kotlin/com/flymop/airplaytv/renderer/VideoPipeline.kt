@@ -251,6 +251,11 @@ class VideoPipeline {
         }
         egl = null
         window = EGL14.EGL_NO_SURFACE
+        hasFrame = false
+        frameAvailable = false
+        lastFrameNs = 0L
+        oesTex = 0
+        program = 0
     }
 
     companion object {
