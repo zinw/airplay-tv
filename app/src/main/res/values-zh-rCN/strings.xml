@@ -1,28 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AirPlay TV</string>
     <string name="ready_to_connect">准备连接</string>
-    <string name="connect_instruction">在 iPhone、iPad 或 Mac 的屏幕镜像或 AirPlay 中选择此设备。</string>
-    <string name="server_name_label">设备名称：</string>
-    <string name="ip_address_label">IP 地址：</string>
-    <string name="port_label">端口：</string>
+    <string name="connect_instruction">在 iPhone、iPad 或 Mac 上打开屏幕镜像或 AirPlay，然后选择此电视。</string>
+    <string name="server_name_label">设备</string>
+    <string name="ip_address_label">网络</string>
+    <string name="port_label">端口</string>
     <string name="how_to_connect">连接方法</string>
-    <string name="step_1_title">同一 Wi-Fi 网络</string>
-    <string name="step_1_desc">将 iPhone、iPad 或 Mac 连接到同一网络</string>
+    <string name="step_1_title">同一 Wi‑Fi</string>
+    <string name="step_1_desc">将 iPhone、iPad 或 Mac 连接到此电视所在网络</string>
     <string name="step_2_title">打开控制中心</string>
     <string name="step_2_desc">点按屏幕镜像或 AirPlay 音频图标</string>
-    <string name="step_3_title">选择电视设备</string>
-    <string name="step_3_desc">选择此设备即可立即开始投屏</string>
-    <string name="status_broadcasting">可投屏 • Bonjour 已就绪</string>
-    <string name="pin_code_title">AirPlay 安全 PIN</string>
+    <string name="step_3_title">选择此电视</string>
+    <string name="step_3_desc">选择此处显示的设备名称即可开始</string>
+    <string name="status_broadcasting">就绪 • 可被发现</string>
+    <string name="status_stopped">已停止</string>
+    <string name="status_error">出错</string>
+    <string name="pin_code_title">请在设备上输入此 PIN</string>
     <string name="settings_title">设置</string>
-    <string name="settings_overlay_title">AirPlay TV 设置</string>
+    <string name="settings_overlay_title">设置</string>
     <string name="settings_close">关闭</string>
     <string name="low_latency">低延迟模式</string>
     <string name="show_hud">显示性能 HUD</string>
 
+    <!-- Home meta chips -->
+    <string name="home_pin_on">PIN 已开启</string>
+    <string name="home_pin_off">PIN 已关闭</string>
+    <string name="home_update_checking">正在检查更新…</string>
+    <string name="home_update_current">已是最新 • %1$s</string>
+    <string name="home_update_available">有可用更新 • %1$s</string>
+    <string name="home_update_unknown">更新 • %1$s</string>
+    <string name="home_section_connection">连接信息</string>
+    <string name="home_section_guide">快速指南</string>
+
     <!-- Settings rows -->
     <string name="setting_device_name">设备名称</string>
-    <string name="setting_device_name_desc">点击重命名广播服务名称</string>
+    <string name="setting_device_name_desc">投屏时显示的名称</string>
     <string name="setting_hud">性能 HUD</string>
     <string name="setting_hud_desc">显示实时帧率、码率与音频缓冲</string>
     <string name="setting_low_latency">超低延迟音频</string>
@@ -34,7 +47,7 @@
     <string name="setting_resolution">分辨率限制</string>
     <string name="setting_resolution_desc">显示分辨率模式</string>
     <string name="setting_pin">PIN 配对安全</string>
-    <string name="setting_pin_desc">配对时需在电视上输入 4 位密码</string>
+    <string name="setting_pin_desc">配对时需在电视上确认 4 位密码</string>
     <string name="setting_language">语言</string>
     <string name="setting_language_desc">应用界面显示语言</string>
     <string name="language_english">English</string>

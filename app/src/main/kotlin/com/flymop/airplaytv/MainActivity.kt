@@ -116,6 +116,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         setupSurfaceView()
         setupSettings()
+        refreshHomeMeta()
         startAndBindService()
         maybeCheckForUpdate()
     }
@@ -124,15 +125,47 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun maybeCheckForUpdate() {
         if (updateCheckStartedThisProcess) return
         updateCheckStartedThisProcess = true
+        binding.tvUpdateStatus.setText(R.string.home_update_checking)
         lifecycleScope.launch {
+            val versionLabel = currentVersionLabel()
             val update = try {
                 AppUpdateChecker.check(this@MainActivity)
             } catch (e: Exception) {
                 Log.i(TAG, "Update check skipped: ${e.message}")
                 null
-            } ?: return@launch
+            }
             if (isFinishing || isDestroyed) return@launch
-            showUpdateAvailableDialog(update)
+            if (update != null) {
+                binding.tvUpdateStatus.text = getString(R.string.home_update_available, update.versionLabel)
+                showUpdateAvailableDialog(update)
+            } else {
+                binding.tvUpdateStatus.text = getString(R.string.home_update_current, versionLabel)
+            }
+        }
+    }
+
+    private fun currentVersionLabel(): String {
+        return try {
+            val pkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0)
+            }
+            pkg.versionName ?: "1.0.0"
+        } catch (_: Exception) {
+            "1.0.0"
+        }
+    }
+
+    private fun refreshHomeMeta() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        binding.tvPinHomeStatus.setText(
+            if (Prefs.isRequirePin(prefs)) R.string.home_pin_on else R.string.home_pin_off
+        )
+        binding.tvLanguageHomeStatus.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        if (binding.tvUpdateStatus.text.isNullOrBlank()) {
+            binding.tvUpdateStatus.text = getString(R.string.home_update_unknown, currentVersionLabel())
         }
     }
 
@@ -155,7 +188,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             "?"
         }
 
-        AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
+        AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
             .setTitle(R.string.update_available_title)
             .setMessage(getString(R.string.update_available_message, update.versionLabel, currentLabel))
             .setPositiveButton(R.string.update_confirm) { _, _ ->
@@ -179,7 +212,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         updateDownloadJob?.cancel()
         downloadProgressDialog?.dismiss()
 
-        val progressDialog = AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
+        val progressDialog = AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
             .setTitle(R.string.update_available_title)
             .setMessage(R.string.update_downloading)
             .setCancelable(false)
@@ -299,6 +332,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val newState = !binding.switchPin.isChecked
             binding.switchPin.isChecked = newState
             prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
+            refreshHomeMeta()
             // restart re-inits native with the new pin_pw / use_pin and clears any stale PIN UI
             airPlayService?.restartServer()
         }
@@ -307,6 +341,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.rowSettingLanguage.setOnClickListener {
             val next = LocaleHelper.cycleLanguage(prefs)
             binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(next))
+            refreshHomeMeta()
         }
     }
 
@@ -345,7 +380,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             setPadding(48, 24, 48, 24)
         }
 
-        AlertDialog.Builder(this, androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert)
+        AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
             .setTitle(R.string.edit_device_name_title)
             .setView(input)
             .setPositiveButton(R.string.save) { _, _ ->
@@ -426,14 +461,17 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                         ServerState.RUNNING -> {
                             binding.tvStatus.text = getString(R.string.status_broadcasting)
                             binding.tvStatus.setTextColor(getColor(R.color.tv_status_green))
+                            binding.tvStatus.setBackgroundResource(R.drawable.bg_status_capsule)
                         }
                         ServerState.STOPPED -> {
-                            binding.tvStatus.text = "Status: Stopped"
+                            binding.tvStatus.text = getString(R.string.status_stopped)
                             binding.tvStatus.setTextColor(getColor(R.color.tv_text_secondary))
+                            binding.tvStatus.setBackgroundResource(R.drawable.bg_chip_neutral)
                         }
                         ServerState.ERROR -> {
-                            binding.tvStatus.text = "Status: Error"
+                            binding.tvStatus.text = getString(R.string.status_error)
                             binding.tvStatus.setTextColor(getColor(android.R.color.holo_red_light))
+                            binding.tvStatus.setBackgroundResource(R.drawable.bg_chip_neutral)
                         }
                     }
                 }

@@ -1,28 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AirPlay TV</string>
     <string name="ready_to_connect">Ready to Connect</string>
-    <string name="connect_instruction">Select this device in Screen Mirroring or AirPlay on your iPhone, iPad, or Mac.</string>
-    <string name="server_name_label">Device Name:</string>
-    <string name="ip_address_label">IP Address:</string>
-    <string name="port_label">Port:</string>
-    <string name="how_to_connect">How to Connect</string>
-    <string name="step_1_title">Same Wi-Fi Network</string>
-    <string name="step_1_desc">Connect iPhone, iPad, or Mac to the same network</string>
+    <string name="connect_instruction">On your iPhone, iPad, or Mac, open Screen Mirroring or AirPlay and select this TV.</string>
+    <string name="server_name_label">Device</string>
+    <string name="ip_address_label">Network</string>
+    <string name="port_label">Port</string>
+    <string name="how_to_connect">How to connect</string>
+    <string name="step_1_title">Same Wi‑Fi</string>
+    <string name="step_1_desc">Join iPhone, iPad, or Mac to this TV’s network</string>
     <string name="step_2_title">Open Control Center</string>
     <string name="step_2_desc">Tap Screen Mirroring or the AirPlay audio icon</string>
-    <string name="step_3_title">Select TV Device</string>
-    <string name="step_3_desc">Choose this device to start streaming instantly</string>
-    <string name="status_broadcasting">Ready to Cast • Bonjour Active</string>
-    <string name="pin_code_title">AirPlay Security PIN</string>
+    <string name="step_3_title">Choose this TV</string>
+    <string name="step_3_desc">Select the device name shown here to start</string>
+    <string name="status_broadcasting">Ready • Discoverable</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="status_error">Error</string>
+    <string name="pin_code_title">Enter this PIN on your device</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_overlay_title">AirPlay TV Settings</string>
+    <string name="settings_overlay_title">Settings</string>
     <string name="settings_close">Close</string>
     <string name="low_latency">Low Latency Mode</string>
     <string name="show_hud">Show Performance HUD</string>
 
+    <!-- Home meta chips -->
+    <string name="home_pin_on">PIN On</string>
+    <string name="home_pin_off">PIN Off</string>
+    <string name="home_update_checking">Checking for updates…</string>
+    <string name="home_update_current">Up to date • %1$s</string>
+    <string name="home_update_available">Update available • %1$s</string>
+    <string name="home_update_unknown">Updates • %1$s</string>
+    <string name="home_section_connection">Connection</string>
+    <string name="home_section_guide">Quick guide</string>
+
     <!-- Settings rows -->
     <string name="setting_device_name">Device Name</string>
-    <string name="setting_device_name_desc">Click to rename broadcast service</string>
+    <string name="setting_device_name_desc">Name shown when casting to this TV</string>
     <string name="setting_hud">Performance HUD</string>
     <string name="setting_hud_desc">Show live FPS, bitrate, and audio cushion</string>
     <string name="setting_low_latency">Ultra-Low Latency Audio</string>
@@ -34,7 +47,7 @@
     <string name="setting_resolution">Resolution Limit</string>
     <string name="setting_resolution_desc">Display resolution mode</string>
     <string name="setting_pin">PIN Pairing Security</string>
-    <string name="setting_pin_desc">Require 4-digit code on TV to pair</string>
+    <string name="setting_pin_desc">Require a 4-digit code on the TV to pair</string>
     <string name="setting_language">Language</string>
     <string name="setting_language_desc">App display language</string>
     <string name="language_english">English</string>
