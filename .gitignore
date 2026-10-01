@@ -13,4 +13,5 @@ app/.cxx/
 *.aab
 build/
 .vscode/
-screenshot*.png
+screenshot*.png__pycache__/
+*.pyc

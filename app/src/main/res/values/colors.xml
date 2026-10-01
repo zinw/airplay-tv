@@ -2,18 +2,28 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="tv_bg_dark">#0B0E17</color>
-    <color name="tv_bg_gradient_end">#121826</color>
-    <color name="tv_card_bg">#161D2E</color>
-    <color name="tv_card_border">#2A3650</color>
-    <color name="tv_accent">#00E5FF</color>
-    <color name="tv_accent_secondary">#7C4DFF</color>
-    <color name="tv_status_green">#00E676</color>
-    <color name="tv_status_bg">#1F00E676</color>
-    <color name="tv_step_badge">#1F2B42</color>
-    <color name="tv_text_primary">#FFFFFF</color>
-    <color name="tv_text_secondary">#9EABC0</color>
-    <color name="tv_text_muted">#62718D</color>
-    <color name="hud_bg">#B3000000</color>
-    <color name="pin_code_bg">#2A2E43</color>
+
+    <!-- Living-room TV palette: deep teal charcoal, cyan accent, amber focus -->
+    <color name="tv_bg_dark">#0A161E</color>
+    <color name="tv_bg_gradient_mid">#0F1F2A</color>
+    <color name="tv_bg_gradient_end">#152836</color>
+    <color name="tv_card_bg">#152A38</color>
+    <color name="tv_card_bg_elevated">#1A3344</color>
+    <color name="tv_card_border">#2A4558</color>
+    <color name="tv_accent">#3DDCFF</color>
+    <color name="tv_accent_dim">#1A3DDCFF</color>
+    <color name="tv_accent_warm">#FFC857</color>
+    <color name="tv_focus_fill">#243B4C</color>
+    <color name="tv_status_green">#3DDC97</color>
+    <color name="tv_status_bg">#1A3DDC97</color>
+    <color name="tv_status_amber_bg">#26FFC857</color>
+    <color name="tv_status_neutral_bg">#26A8B8C4</color>
+    <color name="tv_step_badge">#1E3344</color>
+    <color name="tv_text_primary">#F2F7FA</color>
+    <color name="tv_text_secondary">#A8B8C4</color>
+    <color name="tv_text_muted">#6B8290</color>
+    <color name="hud_bg">#B30A161E</color>
+    <color name="pin_code_bg">#1E3344</color>
+    <color name="scrim_overlay">#D90A161E</color>
+    <color name="divider">#332A4558</color>
 </resources>
