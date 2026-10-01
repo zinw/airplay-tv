@@ -3,6 +3,7 @@
 
 #include <jni.h>
 #include <pthread.h>
+#include <stdint.h>
 #include "raop.h"
 #include "audio_engine.h"
 
@@ -15,6 +16,7 @@ typedef struct {
     jobject callback_obj;
     raop_t *raop;
     jmethodID on_video_data;
+    jmethodID on_video_flush;
     jmethodID on_audio_format;
     jmethodID on_video_size;
     jmethodID on_volume_change;
@@ -34,6 +36,10 @@ typedef struct {
     jmethodID on_video_rate;
     jmethodID on_video_stop;
     jmethodID on_video_session_poll;
+    /* reusable direct ByteBuffer for mirror frames: avoids per-frame NewByteArray GC */
+    jobject video_input_buf;
+    uint8_t *video_input_ptr;
+    jlong video_input_cap;
     int h265_enabled;
     int require_pin;
     char *registered_keys[16];
@@ -52,6 +58,8 @@ void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env);
 void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx);
 void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, double position,
                                              double duration, float rate, int ready);
+void android_callbacks_set_video_input_buffer(android_callback_ctx_t *ctx, JNIEnv *env,
+                                              jobject direct_buf);
 
 #ifdef __cplusplus
 }

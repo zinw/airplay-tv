@@ -40,6 +40,9 @@ static JNIEnv *_get_env(android_callback_ctx_t *ctx) {
 void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject callback_obj) {
     (*env)->GetJavaVM(env, &ctx->jvm);
     ctx->callback_obj = (*env)->NewGlobalRef(env, callback_obj);
+    ctx->video_input_buf = NULL;
+    ctx->video_input_ptr = NULL;
+    ctx->video_input_cap = 0;
     ctx->h265_enabled = 1;
     ctx->require_pin = 0;
     ctx->registered_count = 0;
@@ -54,7 +57,9 @@ void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject ca
     ctx->playback_ready = 0;
 
     jclass cls = (*env)->GetObjectClass(env, callback_obj);
-    ctx->on_video_data = (*env)->GetMethodID(env, cls, "onVideoData", "([BJZ)V");
+    /* (size, ntpNs, isH265) — payload lives in the registered direct buffer */
+    ctx->on_video_data = (*env)->GetMethodID(env, cls, "onVideoData", "(IJZ)V");
+    ctx->on_video_flush = (*env)->GetMethodID(env, cls, "onVideoFlush", "()V");
     ctx->on_audio_format = (*env)->GetMethodID(env, cls, "onAudioFormat", "(IIZ)V");
     ctx->on_video_size = (*env)->GetMethodID(env, cls, "onVideoSize", "(FFFF)V");
     ctx->on_volume_change = (*env)->GetMethodID(env, cls, "onVolumeChange", "(F)V");
@@ -78,6 +83,12 @@ void android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject ca
 }
 
 void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env) {
+    if (ctx->video_input_buf) {
+        (*env)->DeleteGlobalRef(env, ctx->video_input_buf);
+        ctx->video_input_buf = NULL;
+        ctx->video_input_ptr = NULL;
+        ctx->video_input_cap = 0;
+    }
     if (ctx->callback_obj) {
         (*env)->DeleteGlobalRef(env, ctx->callback_obj);
         ctx->callback_obj = NULL;
@@ -88,6 +99,27 @@ void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env) {
     }
     ctx->registered_count = 0;
     pthread_mutex_destroy(&ctx->playback_info_lock);
+}
+
+void android_callbacks_set_video_input_buffer(android_callback_ctx_t *ctx, JNIEnv *env,
+                                              jobject direct_buf) {
+    if (ctx->video_input_buf) {
+        (*env)->DeleteGlobalRef(env, ctx->video_input_buf);
+        ctx->video_input_buf = NULL;
+        ctx->video_input_ptr = NULL;
+        ctx->video_input_cap = 0;
+    }
+    if (!direct_buf) return;
+    void *addr = (*env)->GetDirectBufferAddress(env, direct_buf);
+    jlong cap = (*env)->GetDirectBufferCapacity(env, direct_buf);
+    if (!addr || cap <= 0) {
+        LOGE("video input buffer is not a usable direct ByteBuffer");
+        return;
+    }
+    ctx->video_input_buf = (*env)->NewGlobalRef(env, direct_buf);
+    ctx->video_input_ptr = (uint8_t *)addr;
+    ctx->video_input_cap = cap;
+    LOGI("video input direct buffer registered (%lld bytes)", (long long)cap);
 }
 
 void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, double position,
@@ -118,12 +150,16 @@ static void _video_process(void *cls, raop_ntp_t *ntp, video_decode_struct *data
         LOGE("video packet decryption failed, dropping %d bytes", data->data_len);
         return;
     }
+    if (!ctx->video_input_ptr || data->data_len > ctx->video_input_cap) {
+        LOGE("video frame %d bytes exceeds direct buffer (%lld); dropping",
+             data->data_len, (long long)ctx->video_input_cap);
+        return;
+    }
 
-    jbyteArray arr = (*env)->NewByteArray(env, data->data_len);
-    (*env)->SetByteArrayRegion(env, arr, 0, data->data_len, (jbyte *)data->data);
+    memcpy(ctx->video_input_ptr, data->data, (size_t)data->data_len);
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_video_data,
-                           arr, (jlong)data->ntp_time_local, (jboolean)data->is_h265);
-    (*env)->DeleteLocalRef(env, arr);
+                           (jint)data->data_len, (jlong)data->ntp_time_local,
+                           (jboolean)data->is_h265);
 }
 
 static void _conn_init(void *cls) {
@@ -231,7 +267,13 @@ static void _audio_stop_coverart_rendering(void *cls) {
     if (!env) return;
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_audio_teardown);
 }
-static void _video_flush(void *cls) { LOGI("video_flush"); }
+static void _video_flush(void *cls) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    LOGI("video_flush");
+    JNIEnv *env = _get_env(ctx);
+    if (!env || !ctx->on_video_flush) return;
+    (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_video_flush);
+}
 static double _audio_set_client_volume(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     JNIEnv *env = _get_env(ctx);

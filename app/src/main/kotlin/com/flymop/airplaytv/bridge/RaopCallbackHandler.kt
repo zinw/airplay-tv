@@ -1,7 +1,9 @@
 package com.flymop.airplaytv.bridge
 
 interface RaopCallbackHandler {
-    fun onVideoData(data: ByteArray, ntpTimeNs: Long, isH265: Boolean)
+    /** Mirror NAL payload already copied into the registered direct video buffer. */
+    fun onVideoData(size: Int, ntpTimeNs: Long, isH265: Boolean)
+    fun onVideoFlush()
     fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean)
     fun onVideoSize(srcW: Float, srcH: Float, w: Float, h: Float)
     fun onVolumeChange(volume: Float)

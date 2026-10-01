@@ -4,6 +4,7 @@
 #include <android/log.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaFormat.h>
+#include <sys/resource.h>
 #include <atomic>
 #include <climits>
 #include <cstdint>
@@ -214,6 +215,13 @@ private:
     static constexpr int64_t DRAIN_TIMEOUT_US = 20000;
 
     void drainLoop() {
+        // Match AudioTrack / Oboe callback priority so PCM reaches the ring without
+        // being delayed behind default-priority work on busy TV SoCs.
+#ifndef ANDROID_PRIORITY_AUDIO
+#define ANDROID_PRIORITY_AUDIO (-16)
+#endif
+        setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_AUDIO);
+
         AMediaCodecBufferInfo info;
         while (mDrainRun.load(std::memory_order_relaxed)) {
             ssize_t oi = AMediaCodec_dequeueOutputBuffer(mCodec, &info, DRAIN_TIMEOUT_US);
@@ -298,9 +306,20 @@ public:
             } else if (mFrame->format == AV_SAMPLE_FMT_S16P) {
                 // timeline expects packed/interleaved (AV_SAMPLE_FMT_S16), decoder gives planar
                 if (mPcm.size() < (size_t)n * mChannels) mPcm.resize((size_t)n * mChannels);
-                for (int c = 0; c < mChannels; c++) {
-                    const int16_t *p = (const int16_t *)mFrame->data[c];
-                    for (int i = 0; i < n; i++) mPcm[(size_t)i * mChannels + c] = p[i];
+                if (mChannels == 2) {
+                    // hot path: stereo ALAC — avoid the general per-channel nest
+                    const int16_t *l = (const int16_t *)mFrame->data[0];
+                    const int16_t *r = (const int16_t *)mFrame->data[1];
+                    int16_t *dst = mPcm.data();
+                    for (int i = 0; i < n; i++) {
+                        dst[i * 2] = l[i];
+                        dst[i * 2 + 1] = r[i];
+                    }
+                } else {
+                    for (int c = 0; c < mChannels; c++) {
+                        const int16_t *p = (const int16_t *)mFrame->data[c];
+                        for (int i = 0; i < n; i++) mPcm[(size_t)i * mChannels + c] = p[i];
+                    }
                 }
                 mTimeline.write(mPcm.data(), (size_t)n * mChannels, pts);
             } else {
