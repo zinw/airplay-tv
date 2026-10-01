@@ -205,14 +205,17 @@ Downloads try **GitHub first**, then public prefix mirrors with backoff (for fla
 ### How to publish a test release the updater can see
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
-2. Build an APK, e.g. `./gradlew assembleDebug` or `./gradlew assembleRelease`.
+2. Build an APK, e.g. `./gradlew assembleDebug` or `./gradlew assembleRelease`
+   (both use `keystore/airplaytv-upload.keystore` — see `keystore/README.md`).
 3. Create a **non-draft** GitHub Release on `zinw/airplay-tv`:
-   - **Tag** (required for name compare): `v{versionName}` such as `v1.0.3`.
-   - **Preferred for versionCode compare**: put a line `versionCode: N` in the release body (same `N` as `app/build.gradle.kts`), **or** use tag metadata `v1.0.3+N`.
+   - **Tag** (required for name compare): `v{versionName}` such as `v1.0.4`.
+   - **Preferred for versionCode compare**: put a line `versionCode: N` in the release body (same `N` as `app/build.gradle.kts`), **or** use tag metadata `v1.0.4+N`.
    - **Attach** a clearly named `.apk` asset, for example:
-     - `AirPlayTV-1.0.3-universal.apk`, or
+     - `AirPlayTV-1.0.4-universal.apk`, or
      - ABI-specific names containing `arm64-v8a`, `armeabi-v7a`, `x86_64`, or `universal` (the app prefers the device ABI, then universal).
 4. Publish the release. Relaunch the installed older build on the TV; it should prompt once per process start.
+
+**Signing / overlay:** From **1.0.4** onward, builds share one committed upload keystore, so OTA overlays work. Upgrading from **1.0.1–1.0.3** still needs one uninstall (those Releases each used a different ephemeral debug cert).
 
 Version comparison order: body `versionCode` → tag `+versionCode` / numeric tag → SemVer `versionName` from the tag.
 
