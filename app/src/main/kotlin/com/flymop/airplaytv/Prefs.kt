@@ -34,6 +34,22 @@ object Prefs {
     // lower = less latency, higher = more stable
     const val AUDIO_ADAPTIVE_STEP = "audio_adaptive_step"; const val DEF_AUDIO_ADAPTIVE_STEP = 3
     val ADAPTIVE_PERCENTILES = intArrayOf(80, 85, 90, 95, 99)
+
+    /** Cycle 0→1→2→3→4→0 for TV settings (lower = less latency). */
+    fun nextAudioAdaptiveStep(current: Int): Int {
+        val clamped = current.coerceIn(0, ADAPTIVE_PERCENTILES.lastIndex)
+        return (clamped + 1) % ADAPTIVE_PERCENTILES.size
+    }
+
+    /**
+     * Coarse label bucket for the adaptive cushion step.
+     * Steps 0–1 → low latency, 2–3 → balanced, 4 → stable.
+     */
+    fun audioStabilityBucket(step: Int): Int = when (step.coerceIn(0, ADAPTIVE_PERCENTILES.lastIndex)) {
+        0, 1 -> 0
+        2, 3 -> 1
+        else -> 2
+    }
     const val OBOE_BUFFER_FRAMES = "oboe_buffer_frames"; const val DEF_OBOE_BUFFER_FRAMES = 0
     const val ALAC_ENABLED = "alac_enabled"; const val DEF_ALAC_ENABLED = true
     const val FORCE_SW_ALAC = "force_sw_alac"; const val DEF_FORCE_SW_ALAC = false
