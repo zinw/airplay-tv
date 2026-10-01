@@ -183,7 +183,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="How to Connect"
+                android:text="@string/how_to_connect"
                 android:textColor="@color/tv_text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -496,7 +496,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="AirPlay TV Settings"
+                    android:text="@string/settings_overlay_title"
                     android:textColor="@color/tv_accent"
                     android:textSize="24sp"
                     android:textStyle="bold" />
@@ -509,7 +509,7 @@
                     android:focusable="true"
                     android:paddingHorizontal="18dp"
                     android:paddingVertical="8dp"
-                    android:text="Close"
+                    android:text="@string/settings_close"
                     android:textColor="@color/btn_text_focusable"
                     android:textSize="13sp"
                     android:textStyle="bold" />
@@ -554,7 +554,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Device Name"
+                                android:text="@string/setting_device_name"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -563,7 +563,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Click to rename broadcast service"
+                                android:text="@string/setting_device_name_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -601,7 +601,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Performance HUD"
+                                android:text="@string/setting_hud"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -610,7 +610,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Show live FPS, bitrate, and audio cushion"
+                                android:text="@string/setting_hud_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -646,7 +646,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Ultra-Low Latency Audio"
+                                android:text="@string/setting_low_latency"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -655,7 +655,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Google Oboe AAudio game performance path"
+                                android:text="@string/setting_low_latency_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -691,7 +691,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="H.265 / HEVC Decoding"
+                                android:text="@string/setting_h265"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -700,7 +700,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Hardware video acceleration up to 4K"
+                                android:text="@string/setting_h265_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -736,7 +736,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Max Frame Rate"
+                                android:text="@string/setting_max_fps"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -745,7 +745,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Target video frame rate limit"
+                                android:text="@string/setting_max_fps_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -783,7 +783,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Resolution Limit"
+                                android:text="@string/setting_resolution"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -792,7 +792,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Display resolution mode"
+                                android:text="@string/setting_resolution_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -802,7 +802,7 @@
                             android:id="@+id/tvSettingResolutionVal"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Auto"
+                            android:text="@string/resolution_auto"
                             android:textColor="@color/tv_accent"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -830,7 +830,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="PIN Pairing Security"
+                                android:text="@string/setting_pin"
                                 android:textColor="@color/tv_text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
@@ -839,7 +839,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Require 4-digit code on TV to pair"
+                                android:text="@string/setting_pin_desc"
                                 android:textColor="@color/tv_text_secondary"
                                 android:textSize="12sp" />
 
@@ -851,6 +851,53 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false" />
+
+                    </LinearLayout>
+
+                    <!-- Setting: Language -->
+                    <LinearLayout
+                        android:id="@+id/rowSettingLanguage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_setting_item_focusable"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="14dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_language"
+                                android:textColor="@color/tv_text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/setting_language_desc"
+                                android:textColor="@color/tv_text_secondary"
+                                android:textSize="12sp" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvSettingLanguageVal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/language_english"
+                            android:textColor="@color/tv_accent"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
 
                     </LinearLayout>
 

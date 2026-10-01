@@ -30,6 +30,9 @@ bool audio_engine_configure(AudioEngine *engine, int cushionMs, int percentilePc
 /* sender is switching audio formats */
 void audio_engine_on_format(AudioEngine *engine, int ct, int spf);
 
+/* discard buffered / in-flight audio after RAOP FLUSH (seek, next episode, etc.) */
+void audio_engine_flush(AudioEngine *engine);
+
 /* begin or resume playout; false if stream fails to open; idempotent */
 bool audio_engine_start(AudioEngine *engine);
 

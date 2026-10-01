@@ -220,6 +220,8 @@ public:
     // producer: push samples
     void write(const int16_t *pcm, size_t samples, int64_t ptsNs) {
         if (samples == 0) return;
+        // drop while a flush is pending so new PCM is not queued behind stale audio
+        if (mFlushRequested.load(std::memory_order_acquire)) return;
         // pts 0 = sender clock not NTP synced yet
         if (ptsNs == 0) {
             mRing.write(pcm, samples);
@@ -232,19 +234,29 @@ public:
         if (mUnderran.exchange(false, std::memory_order_relaxed)) {
             mExpectedPtsNs = ptsNs;
         }
+
+        // first packet after start/flush: establish timeline head (do not treat as gap)
+        if (mExpectedPtsNs == 0) {
+            mTracker.observe(ptsNs, monoNs(), durNs);
+            mRing.write(pcm, samples);
+            mExpectedPtsNs = ptsNs + durNs;
+            return;
+        }
+
         const int64_t gapNs = ptsNs - mExpectedPtsNs;
 
-        // large gap: possible discontinuity or clock shift. reanchor() must precede
-        // observe() so the reset applies to this observation
-        if (gapNs > MAX_GAP_NS || gapNs < -MAX_GAP_NS) mTracker.reanchor();
+        // large gap: discontinuity (seek / next episode) or clock shift. discard stale
+        // backlog via consumer flush; this packet is dropped, the next post-flush packet
+        // becomes the new timeline head
+        if (gapNs > MAX_GAP_NS || gapNs < -MAX_GAP_NS) {
+            requestFlush();
+            return;
+        }
 
         // no-op in static-cushion mode
         mTracker.observe(ptsNs, monoNs(), durNs);
 
-        if (gapNs > MAX_GAP_NS || gapNs < -MAX_GAP_NS) {
-            // discontinuity: write immediately. new sound after long silence resets
-            // backlog to ideal size (less latency); on clock resync we keep the sound
-        } else if (gapNs > SLACK_NS) {
+        if (gapNs > SLACK_NS) {
             // sender left gap: reproduce as silence so timing is exact
             const size_t silenceFrames = (size_t)(gapNs * mSampleRate / NS_PER_SEC);
             writeSilenceFrames(silenceFrames);
@@ -261,8 +273,19 @@ public:
     // consumer: pop frames*channels samples into out, silence-padded on underrun
     void read(int16_t *out, int32_t frames) {
         const size_t need = (size_t)frames * mChannels;
-        const size_t tuned = mTracker.target();
         const int64_t now = monoNs();
+
+        // apply producer-requested flush on the consumer side (skip is consumer-only)
+        if (mFlushRequested.exchange(false, std::memory_order_acq_rel)) {
+            mRing.skip(mRing.available());
+            mPriming = true;
+            mPostFlushPrime = true;
+            mPrimeSilenceFrames = 0;
+            mAboveCapSinceNs = 0;
+            mUnderran.store(false, std::memory_order_relaxed);
+        }
+
+        const size_t tuned = mTracker.target();
 
         // bound latency: cap tracks tuned cushion live so a calmed link sheds latency
         // without an underrun. each trim costs a glitch, so be conservative: trim only
@@ -283,25 +306,24 @@ public:
             mAboveCapSinceNs = 0;
         }
 
-        // prebuffer: hold output until cushion fills, builds jitter headroom
+        // prebuffer: hold output until cushion fills, builds jitter headroom.
+        // after an intentional flush (seek / next episode), prime with a short floor so
+        // we do not wait up to ~2x the adaptive cushion (can be 1–2s of silence)
         if (mPriming) {
             const size_t buffered = mRing.available();
-            // time the wait only while holding partial data; reset on empty ring so the
-            // producer gets the full window once a sound starts, otherwise we could time
-            // out on pre-sound silence and underrun the instant the first frame lands
+            const size_t primeTarget = mPostFlushPrime
+                    ? std::min(tuned, postFlushPrimeSamples())
+                    : tuned;
             if (buffered == 0) mPrimeSilenceFrames = 0;
             else mPrimeSilenceFrames += (uint32_t)frames;
-            // short sound can end before filling cushion; after holding partial data
-            // through 2x cushion of silence the sound is complete: play it
-            const uint32_t starveFrames = (uint32_t)(2 * tuned / mChannels);
+            const uint32_t starveFrames = (uint32_t)(2 * primeTarget / mChannels);
             const bool starved = buffered > 0 && mPrimeSilenceFrames >= starveFrames;
-            // also keep priming on empty ring: with 0 cushion `buffered < tuned` is
-            // never true, so we'd otherwise underrun on every empty read between sounds
-            if (buffered == 0 || (buffered < tuned && !starved)) {
+            if (buffered == 0 || (buffered < primeTarget && !starved)) {
                 memset(out, 0, need * sizeof(int16_t));
                 return;
             }
             mPriming = false;
+            mPostFlushPrime = false;
             mPrimeSilenceFrames = 0;
         }
 
@@ -309,6 +331,7 @@ public:
         if (got < need) {
             memset(out + got, 0, (need - got) * sizeof(int16_t));
             mPriming = true;
+            mPostFlushPrime = false;  // underrun rebuild uses full adaptive cushion
             mLastTrimBlockNs = now;  // hold off trims while rebuilding
             mUnderran.store(true, std::memory_order_relaxed);  // producer re-anchors
             mMetrics.countUnderrun();
@@ -319,15 +342,30 @@ public:
     // concurrently with write()
     void reanchorTracker() { mTracker.reanchor(); }
 
+    // producer (or same thread as write): request consumer to discard backlog and
+    // reprime with a short post-flush cushion. safe while Oboe is reading.
+    void requestFlush() {
+        mExpectedPtsNs = 0;
+        mTracker.reanchor();
+        mFlushRequested.store(true, std::memory_order_release);
+    }
+
     // rebuild prebuffer cushion before resuming, e.g. after output stream restart;
     // must not run concurrently with read()
-    void reprime() { mPriming = true; }
+    void reprime() { mPriming = true; mPostFlushPrime = false; }
 
     // drop buffered audio + rebuild cushion, so resume after pause doesn't play stale
     // tail; only while output callback is stopped (skip() is consumer-side)
     void flushAndReprime() {
         mRing.skip(mRing.available());
+        mExpectedPtsNs = 0;
+        mTracker.reanchor();
+        mFlushRequested.store(false, std::memory_order_relaxed);
         mPriming = true;
+        mPostFlushPrime = false;
+        mPrimeSilenceFrames = 0;
+        mAboveCapSinceNs = 0;
+        mUnderran.store(false, std::memory_order_relaxed);
     }
 
     // debug snapshot: backlog + tuned cushion (ms) + counters; reads only atomics, any thread
@@ -352,6 +390,10 @@ private:
         return std::max(cushionSamples * 2, (size_t)mSampleRate * TRIM_FLOOR_MS / 1000 * mChannels);
     }
 
+    size_t postFlushPrimeSamples() const {
+        return (size_t)mSampleRate * POST_FLUSH_PRIME_MS / 1000 * mChannels;
+    }
+
     void writeSilenceFrames(size_t frames) {
         int16_t zeros[512] = {0};  // 256 stereo frames per chunk
         size_t samples = frames * mChannels;
@@ -369,6 +411,7 @@ private:
     static constexpr int64_t TRIM_THROTTLE_NS = (int64_t)TRIM_THROTTLE_MS * 1'000'000LL;
     static constexpr int TRIM_SUSTAIN_MS = 2000;         // backlog must exceed cap this long before trim
     static constexpr int64_t TRIM_SUSTAIN_NS = (int64_t)TRIM_SUSTAIN_MS * 1'000'000LL;
+    static constexpr int POST_FLUSH_PRIME_MS = 40;       // short prime after seek / episode FLUSH
 
     const int mSampleRate;
     const int mChannels;
@@ -376,10 +419,12 @@ private:
     SpscRing mRing;
     TimelineMetrics mMetrics;
     bool mPriming = true;                // stream start: buffer output to build cushion
+    bool mPostFlushPrime = false;        // intentional flush: use short prime, not full cushion
     uint32_t mPrimeSilenceFrames = 0;    // consumer-only: silence frames output while priming with partial data
     int64_t mLastTrimBlockNs = 0;        // consumer-only: last trim/underrun time (trim throttle)
     int64_t mAboveCapSinceNs = 0;        // consumer-only: when backlog first exceeded cap (0 = under)
     std::atomic<bool> mUnderran{false};  // consumer->producer: underrun happened
+    std::atomic<bool> mFlushRequested{false};  // producer->consumer: discard backlog
 
     int64_t mExpectedPtsNs = 0;          // presentation time expected at write head
 };

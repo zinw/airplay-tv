@@ -101,6 +101,12 @@ struct AudioEngine {
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
     }
 
+    // RAOP FLUSH / seek / next-episode discontinuity: clear decoder delay + playout backlog
+    void flush() {
+        if (mDecoder.decoder) mDecoder.decoder->flush();
+        if (mTimeline) mTimeline->requestFlush();
+    }
+
     bool copyDebug(void *dst, size_t dstLen) {
         if (dstLen < sizeof(AudioDebugData)) return false;
         {
@@ -232,6 +238,10 @@ bool audio_engine_configure(AudioEngine *engine, int cushionMs, int percentilePc
 
 void audio_engine_on_format(AudioEngine *engine, int ct, int spf) {
     if (engine) engine->onFormat(ct, spf);
+}
+
+void audio_engine_flush(AudioEngine *engine) {
+    if (engine) engine->flush();
 }
 
 bool audio_engine_start(AudioEngine *engine) {
