@@ -69,11 +69,11 @@
                 android:textColor="@color/tv_text_secondary"
                 android:textSize="16sp" />
 
-            <!-- Status chips: connection / PIN / language -->
+            <!-- Status + always-visible build id for device QA -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="18dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -82,6 +82,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_status_capsule"
+                    android:focusable="false"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="7dp"
                     android:text="@string/status_broadcasting"
@@ -90,28 +91,84 @@
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tvPinHomeStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:background="@drawable/bg_chip_amber"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="7dp"
-                    android:text="@string/home_pin_off"
-                    android:textColor="@color/tv_accent_warm"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvLanguageHomeStatus"
+                    android:id="@+id/tvAppVersion"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:background="@drawable/bg_chip_neutral"
+                    android:focusable="false"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="7dp"
-                    android:text="@string/language_english"
+                    android:text="@string/app_version_label"
                     android:textColor="@color/tv_text_secondary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:text="Version 1.0.3 (4)" />
+
+            </LinearLayout>
+            <!--
+              D-pad action row: must stay above the fold on overscanned TVs.
+              Language / PIN / Settings are the only ambient focus targets.
+            -->
+            <LinearLayout
+                android:id="@+id/homeActionRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnSettings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_button_focusable"
+                    android:focusable="true"
+                    android:focusedByDefault="true"
+                    android:minWidth="132dp"
+                    android:nextFocusRight="@+id/btnLanguageHome"
+                    android:paddingHorizontal="22dp"
+                    android:paddingVertical="12dp"
+                    android:text="@string/settings_title"
+                    android:textAllCaps="false"
+                    android:textColor="@color/btn_text_focusable"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnLanguageHome"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_chip_focusable"
+                    android:focusable="true"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:nextFocusLeft="@+id/btnSettings"
+                    android:nextFocusRight="@+id/btnPinHome"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:text="@string/language_english"
+                    android:textAllCaps="false"
+                    android:textColor="@color/tv_text_secondary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnPinHome"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_chip_amber_focusable"
+                    android:focusable="true"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:nextFocusLeft="@+id/btnLanguageHome"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:text="@string/home_pin_off"
+                    android:textAllCaps="false"
+                    android:textColor="@color/tv_accent_warm"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
@@ -121,11 +178,11 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="20dp"
                 android:background="@drawable/bg_card_modern"
                 android:orientation="vertical"
                 android:paddingHorizontal="22dp"
-                android:paddingVertical="20dp">
+                android:paddingVertical="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -139,7 +196,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="12dp"
                     android:text="@string/server_name_label"
                     android:textColor="@color/tv_text_muted"
                     android:textSize="13sp" />
@@ -158,7 +215,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginVertical="14dp"
+                    android:layout_marginVertical="12dp"
                     android:background="@color/divider" />
 
                 <TextView
@@ -183,28 +240,12 @@
                     android:id="@+id/tvUpdateStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="12dp"
                     android:text="@string/home_update_checking"
                     android:textColor="@color/tv_text_muted"
                     android:textSize="13sp" />
 
             </LinearLayout>
-
-            <Button
-                android:id="@+id/btnSettings"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
-                android:background="@drawable/bg_button_focusable"
-                android:focusable="true"
-                android:minWidth="160dp"
-                android:paddingHorizontal="28dp"
-                android:paddingVertical="14dp"
-                android:text="@string/settings_title"
-                android:textAllCaps="false"
-                android:textColor="@color/btn_text_focusable"
-                android:textSize="16sp"
-                android:textStyle="bold" />
 
         </LinearLayout>
 
@@ -541,14 +582,32 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/settings_overlay_title"
-                    android:textColor="@color/tv_text_primary"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_overlay_title"
+                        android:textColor="@color/tv_text_primary"
+                        android:textSize="26sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvSettingsVersion"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:focusable="false"
+                        android:text="@string/app_version_label"
+                        android:textColor="@color/tv_text_muted"
+                        android:textSize="13sp"
+                        tools:text="Version 1.0.3 (4)" />
+
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/btnCloseSettings"

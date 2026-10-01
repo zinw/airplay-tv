@@ -44,6 +44,7 @@ object AppUpdateChecker {
         val remoteVersionName: String?,
         val apkDownloadUrl: String,
         val apkFileName: String,
+        val apkSizeBytes: Long?,
         val releaseNotes: String?,
         val htmlUrl: String,
     )
@@ -76,6 +77,7 @@ object AppUpdateChecker {
         val apkUrl = apk.optString("browser_download_url").orEmpty()
         val apkName = apk.optString("name").orEmpty()
         if (apkUrl.isBlank() || apkName.isBlank()) return@withContext null
+        val apkSize = apk.optLong("size", -1L).takeIf { it > 0L }
 
         val label = when {
             remoteName != null && remoteCode != null -> "$remoteName ($remoteCode)"
@@ -92,6 +94,7 @@ object AppUpdateChecker {
             remoteVersionName = remoteName,
             apkDownloadUrl = apkUrl,
             apkFileName = apkName,
+            apkSizeBytes = apkSize,
             releaseNotes = body.takeIf { it.isNotBlank() },
             htmlUrl = htmlUrl,
         )

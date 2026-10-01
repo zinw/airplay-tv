@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var pendingInstallUpdate: AppUpdateChecker.AvailableUpdate? = null
     private var updateDownloadJob: Job? = null
     private var downloadProgressDialog: AlertDialog? = null
+    private var lastAvailableUpdate: AppUpdateChecker.AvailableUpdate? = null
 
     private val installPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -117,6 +118,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         setupSurfaceView()
         setupSettings()
         refreshHomeMeta()
+        bindVersionLabels()
         startAndBindService()
         maybeCheckForUpdate()
     }
@@ -136,6 +138,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
             if (isFinishing || isDestroyed) return@launch
             if (update != null) {
+                lastAvailableUpdate = update
                 binding.tvUpdateStatus.text = getString(R.string.home_update_available, update.versionLabel)
                 showUpdateAvailableDialog(update)
             } else {
@@ -144,33 +147,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
-    private fun currentVersionLabel(): String {
+    private fun currentVersion(): Pair<String, Long> {
         return try {
-            val pkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getPackageInfo(packageName, 0)
-            }
-            pkg.versionName ?: "1.0.0"
-        } catch (_: Exception) {
-            "1.0.0"
-        }
-    }
-
-    private fun refreshHomeMeta() {
-        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-        binding.tvPinHomeStatus.setText(
-            if (Prefs.isRequirePin(prefs)) R.string.home_pin_on else R.string.home_pin_off
-        )
-        binding.tvLanguageHomeStatus.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
-        if (binding.tvUpdateStatus.text.isNullOrBlank()) {
-            binding.tvUpdateStatus.text = getString(R.string.home_update_unknown, currentVersionLabel())
-        }
-    }
-
-    private fun showUpdateAvailableDialog(update: AppUpdateChecker.AvailableUpdate) {
-        val currentLabel = try {
             val pkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
             } else {
@@ -183,10 +161,44 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 @Suppress("DEPRECATION")
                 pkg.versionCode.toLong()
             }
-            "${pkg.versionName ?: "?"} ($code)"
+            (pkg.versionName ?: "1.0.0") to code
         } catch (_: Exception) {
-            "?"
+            "1.0.0" to 0L
         }
+    }
+
+    /** Short form used in update status lines, e.g. `1.0.3 (4)`. */
+    private fun currentVersionLabel(): String {
+        val (name, code) = currentVersion()
+        return getString(R.string.app_version_short, name, code)
+    }
+
+    /** Localized label for home chip / settings header, e.g. `Version 1.0.3 (4)`. */
+    private fun currentVersionDisplay(): String {
+        val (name, code) = currentVersion()
+        return getString(R.string.app_version_label, name, code)
+    }
+
+    private fun bindVersionLabels() {
+        val label = currentVersionDisplay()
+        binding.tvAppVersion.text = label
+        binding.tvSettingsVersion.text = label
+    }
+
+    private fun refreshHomeMeta() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        binding.btnPinHome.setText(
+            if (Prefs.isRequirePin(prefs)) R.string.home_pin_on else R.string.home_pin_off
+        )
+        binding.btnLanguageHome.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        bindVersionLabels()
+        if (binding.tvUpdateStatus.text.isNullOrBlank()) {
+            binding.tvUpdateStatus.text = getString(R.string.home_update_unknown, currentVersionLabel())
+        }
+    }
+
+    private fun showUpdateAvailableDialog(update: AppUpdateChecker.AvailableUpdate) {
+        val currentLabel = currentVersionLabel()
 
         AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
             .setTitle(R.string.update_available_title)
@@ -211,11 +223,18 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun startDownloadAndInstall(update: AppUpdateChecker.AvailableUpdate) {
         updateDownloadJob?.cancel()
         downloadProgressDialog?.dismiss()
+        lastAvailableUpdate = update
 
         val progressDialog = AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
             .setTitle(R.string.update_available_title)
             .setMessage(R.string.update_downloading)
-            .setCancelable(false)
+            .setCancelable(true)
+            .setNegativeButton(R.string.update_cancel) { _, _ ->
+                updateDownloadJob?.cancel()
+            }
+            .setOnCancelListener {
+                updateDownloadJob?.cancel()
+            }
             .create()
         downloadProgressDialog = progressDialog
         progressDialog.show()
@@ -226,29 +245,60 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     context = this@MainActivity,
                     url = update.apkDownloadUrl,
                     fileName = update.apkFileName,
-                ) { downloaded, total ->
-                    if (total > 0L) {
-                        val pct = ((downloaded * 100L) / total).toInt().coerceIn(0, 100)
-                        runOnUiThread {
-                            if (progressDialog.isShowing) {
-                                progressDialog.setMessage(getString(R.string.update_download_progress, pct))
-                            }
+                    expectedSizeBytes = update.apkSizeBytes,
+                ) { progress ->
+                    val total = progress.total
+                    runOnUiThread {
+                        if (!progressDialog.isShowing) return@runOnUiThread
+                        if (total > 0L) {
+                            val pct = ((progress.downloaded * 100L) / total).toInt().coerceIn(0, 100)
+                            progressDialog.setMessage(
+                                getString(
+                                    R.string.update_download_progress_via,
+                                    progress.sourceLabel,
+                                    pct,
+                                )
+                            )
+                        } else {
+                            progressDialog.setMessage(
+                                getString(
+                                    R.string.update_download_retrying,
+                                    progress.attempt,
+                                )
+                            )
                         }
                     }
                 }
                 if (isFinishing || isDestroyed) return@launch
                 progressDialog.setMessage(getString(R.string.update_installing))
                 ApkInstaller.install(this@MainActivity, apk)
-            } catch (e: Exception) {
-                Log.w(TAG, "Update download/install failed", e)
-                if (!isFinishing && !isDestroyed) {
-                    Toast.makeText(this@MainActivity, R.string.update_failed, Toast.LENGTH_LONG).show()
-                }
-            } finally {
                 if (progressDialog.isShowing) progressDialog.dismiss()
                 if (downloadProgressDialog === progressDialog) downloadProgressDialog = null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                Log.i(TAG, "Update download cancelled")
+                if (progressDialog.isShowing) progressDialog.dismiss()
+                if (downloadProgressDialog === progressDialog) downloadProgressDialog = null
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Update download/install failed", e)
+                if (progressDialog.isShowing) progressDialog.dismiss()
+                if (downloadProgressDialog === progressDialog) downloadProgressDialog = null
+                if (!isFinishing && !isDestroyed) {
+                    showUpdateFailedDialog(update, e.message ?: e.javaClass.simpleName)
+                }
             }
         }
+    }
+
+    private fun showUpdateFailedDialog(update: AppUpdateChecker.AvailableUpdate, reason: String) {
+        AlertDialog.Builder(this, R.style.Theme_AirPlayTV_Dialog)
+            .setTitle(R.string.update_failed_title)
+            .setMessage(getString(R.string.update_failed_message, reason))
+            .setPositiveButton(R.string.update_retry) { _, _ ->
+                confirmUpdateInstall(update)
+            }
+            .setNegativeButton(R.string.update_cancel, null)
+            .show()
     }
 
     private fun setupSurfaceView() {
@@ -269,10 +319,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
         binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
 
-        // Open settings button on main screen
-        binding.btnSettings.setOnClickListener {
-            openSettings()
-        }
+        // Home D-pad action row (above the fold)
+        binding.btnSettings.setOnClickListener { openSettings() }
+        binding.btnLanguageHome.setOnClickListener { cycleLanguageFromHome() }
+        binding.btnPinHome.setOnClickListener { togglePinFromHome() }
+        binding.btnSettings.requestFocus()
 
         // Close button inside settings
         binding.btnCloseSettings.setOnClickListener {
@@ -329,20 +380,30 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         // Row: PIN Security
         binding.rowSettingPin.setOnClickListener {
-            val newState = !binding.switchPin.isChecked
-            binding.switchPin.isChecked = newState
-            prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
-            refreshHomeMeta()
-            // restart re-inits native with the new pin_pw / use_pin and clears any stale PIN UI
-            airPlayService?.restartServer()
+            togglePinFromHome()
         }
 
-        // Row: Language (English <-> 简体中文)
+        // Row: Language (System <-> 简体中文 <-> English)
         binding.rowSettingLanguage.setOnClickListener {
-            val next = LocaleHelper.cycleLanguage(prefs)
-            binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(next))
-            refreshHomeMeta()
+            cycleLanguageFromHome()
         }
+    }
+
+    private fun cycleLanguageFromHome() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val next = LocaleHelper.cycleLanguage(prefs)
+        binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(next))
+        binding.btnLanguageHome.setText(LocaleHelper.displayNameRes(next))
+        refreshHomeMeta()
+    }
+
+    private fun togglePinFromHome() {
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val newState = !Prefs.isRequirePin(prefs)
+        binding.switchPin.isChecked = newState
+        prefs.edit().putBoolean(Prefs.REQUIRE_PIN, newState).apply()
+        refreshHomeMeta()
+        airPlayService?.restartServer()
     }
 
     private fun resolutionLabel(res: String): String {
@@ -359,6 +420,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.tvSettingResolutionVal.text = resolutionLabel(prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION)
         binding.tvSettingMaxFpsVal.text = getString(R.string.fps_value, prefs.getInt(Prefs.MAX_FPS, Prefs.DEF_MAX_FPS))
         binding.tvSettingLanguageVal.setText(LocaleHelper.displayNameRes(LocaleHelper.getLanguage(prefs)))
+        bindVersionLabels()
 
         binding.settingsOverlay.visibility = View.VISIBLE
         binding.rowSettingDeviceName.requestFocus()
@@ -792,7 +854,20 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 return true
             }
 
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_PROG_BLUE -> {
+            KeyEvent.KEYCODE_MENU -> {
+                if (isSettingsOpen) {
+                    closeSettings()
+                    return true
+                }
+                if (isAmbientOpen) {
+                    openSettings()
+                    return true
+                }
+                toggleHud()
+                return true
+            }
+
+            KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_PROG_BLUE -> {
                 toggleHud()
                 return true
             }
