@@ -36,7 +36,7 @@ object Prefs {
     val ADAPTIVE_PERCENTILES = intArrayOf(80, 85, 90, 95, 99)
     const val OBOE_BUFFER_FRAMES = "oboe_buffer_frames"; const val DEF_OBOE_BUFFER_FRAMES = 0
     const val ALAC_ENABLED = "alac_enabled"; const val DEF_ALAC_ENABLED = true
-    const val FORCE_SW_ALAC = "force_sw_alac"; const val DEF_FORCE_SW_ALAC = true
+    const val FORCE_SW_ALAC = "force_sw_alac"; const val DEF_FORCE_SW_ALAC = false
     const val AAC_ENABLED = "aac_enabled"; const val DEF_AAC_ENABLED = true
     const val RESOLUTION = "resolution"; const val DEF_RESOLUTION = AUTO
     const val MAX_FPS = "max_fps"; const val DEF_MAX_FPS = 60

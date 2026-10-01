@@ -7,6 +7,7 @@ import android.media.MediaFormat
 import android.util.Log
 import android.view.Surface
 import com.flymop.airplaytv.renderer.DecoderSelector.Companion.videoCaps
+import java.nio.ByteBuffer
 
 class VideoRenderer(ctx: Context) {
 
@@ -22,6 +23,13 @@ class VideoRenderer(ctx: Context) {
     private var videoWidth = 0
     private var videoHeight = 0
     private var firstFrameQueued = false
+
+    /**
+     * Direct scratch filled by native `_video_process` before [feedFrame] runs.
+     * Sized for 4K I-frames without per-frame Java heap allocations.
+     */
+    val nativeInputBuffer: ByteBuffer =
+        ByteBuffer.allocateDirect(NATIVE_INPUT_CAPACITY)
 
     // stats
     @Volatile var fps = 0; private set
@@ -87,6 +95,9 @@ class VideoRenderer(ctx: Context) {
 
     fun stopSession() = synchronized(lock) { stopCodec() }
 
+    /** RAOP video_flush / discontinuity: drop codec state and wait for the next keyframe. */
+    fun flushSession() = synchronized(lock) { stopCodec() }
+
     private fun _resetStats() {
         fps = 0; bitrateBps = 0; frameCount = 0; codecName = ""
         droppedFrames = 0; framePacingJitterUs = 0
@@ -118,14 +129,19 @@ class VideoRenderer(ctx: Context) {
         benchmarkLogCallback?.invoke(msg)
     }
 
-    fun feedFrame(data: ByteArray, ntpTimeNs: Long, isH265: Boolean) {
+    /**
+     * Feed a frame already written into [nativeInputBuffer] (first [size] bytes).
+     * Called synchronously from the RAOP mirror thread — must not block for long.
+     */
+    fun feedFrame(size: Int, ntpTimeNs: Long, isH265: Boolean) {
         synchronized(lock) {
-            _updateStats(data.size)
+            if (size <= 0 || size > nativeInputBuffer.capacity()) return
+            _updateStats(size)
             if (videoWidth == 0 || videoHeight == 0) return
 
             if (codec == null || isH265 != currentH265) {
                 // a stale reference frame decodes to corruption, so wait for a keyframe to (re)start
-                if (!_isKeyframe(data, isH265)) {
+                if (!_isKeyframe(nativeInputBuffer, size, isH265)) {
                     if (codec != null) stopCodec()
                     return
                 }
@@ -134,7 +150,7 @@ class VideoRenderer(ctx: Context) {
 
             try {
                 if (codec == null) startCodec(isH265)
-                _feedToCodec(data, ntpTimeNs)
+                _feedToCodec(size, ntpTimeNs)
                 drainOutput()
             } catch (e: Exception) {
                 Log.w(TAG, "Codec error, resetting", e)
@@ -143,17 +159,28 @@ class VideoRenderer(ctx: Context) {
         }
     }
 
-    private fun _feedToCodec(data: ByteArray, ntpTimeNs: Long) {
+    private fun _feedToCodec(size: Int, ntpTimeNs: Long) {
         val c = codec ?: return
         // dropping a frame desyncs decoder until the next keyframe, but source would only send one on (re)connect
+        // Never block the RAOP mirror thread for tens of ms — 60fps leaves ~16ms/frame.
+        val waitUs = if (firstFrameQueued) FEED_WAIT_US else FIRST_FEED_WAIT_US
         val retries = if (firstFrameQueued) FEED_RETRIES else FIRST_FEED_RETRIES
         repeat(retries) {
-            val idx = c.dequeueInputBuffer(FEED_WAIT_US)
+            val idx = c.dequeueInputBuffer(waitUs)
             if (idx >= 0) {
                 val buf = c.getInputBuffer(idx) ?: return
                 buf.clear()
-                buf.put(data)
-                c.queueInputBuffer(idx, 0, data.size, ntpTimeNs / 1000, 0)
+                if (buf.remaining() < size) {
+                    Log.w(TAG, "Codec input buffer too small (${buf.remaining()} < $size); dropping")
+                    c.queueInputBuffer(idx, 0, 0, 0, 0)
+                    droppedFrames++
+                    return
+                }
+                nativeInputBuffer.position(0)
+                nativeInputBuffer.limit(size)
+                buf.put(nativeInputBuffer)
+                nativeInputBuffer.clear()
+                c.queueInputBuffer(idx, 0, size, ntpTimeNs / 1000, 0)
                 firstFrameQueued = true
                 return
             }
@@ -163,22 +190,26 @@ class VideoRenderer(ctx: Context) {
         Log.w(TAG, "Decoder input queue full; dropping frame. drops=$droppedFrames")
     }
 
-    private fun _isKeyframe(data: ByteArray, isH265: Boolean): Boolean {
-        if (data.size < 4) return false
-        val limit = minOf(data.size - 4, 8192)
+    private fun _isKeyframe(data: ByteBuffer, size: Int, isH265: Boolean): Boolean {
+        if (size < 4) return false
+        val limit = minOf(size - 4, 8192)
         var i = 0
         while (i <= limit) {
-            val is4Byte = i + 4 <= data.size && data[i] == 0.toByte() && data[i + 1] == 0.toByte() && data[i + 2] == 0.toByte() && data[i + 3] == 1.toByte()
-            val is3Byte = !is4Byte && i + 3 <= data.size && data[i] == 0.toByte() && data[i + 1] == 0.toByte() && data[i + 2] == 1.toByte()
+            val b0 = data.get(i).toInt()
+            val b1 = data.get(i + 1).toInt()
+            val b2 = data.get(i + 2).toInt()
+            val is4Byte = i + 4 <= size && b0 == 0 && b1 == 0 && b2 == 0 && data.get(i + 3).toInt() == 1
+            val is3Byte = !is4Byte && i + 3 <= size && b0 == 0 && b1 == 0 && b2 == 1
 
             if (is4Byte || is3Byte) {
                 val headerOffset = if (is4Byte) i + 4 else i + 3
-                if (headerOffset < data.size) {
+                if (headerOffset < size) {
+                    val header = data.get(headerOffset).toInt()
                     val key = if (isH265) {
-                        val type = (data[headerOffset].toInt() shr 1) and 0x3F
+                        val type = (header shr 1) and 0x3F
                         type in 19..21 || type == 32 || type == 33
                     } else {
-                        val type = data[headerOffset].toInt() and 0x1F
+                        val type = header and 0x1F
                         type == 5 || type == 7
                     }
                     if (key) return true
@@ -262,6 +293,7 @@ class VideoRenderer(ctx: Context) {
         _lastOutputFrameNs = 0L
         _ptsBaseUs = Long.MIN_VALUE
         _wallBaseNs = 0L
+        firstFrameQueued = false
         codec?.let {
             try {
                 it.stop()
@@ -327,8 +359,13 @@ class VideoRenderer(ctx: Context) {
     companion object {
         private const val TAG = "VideoRenderer"
         private const val BENCH_TAG = "BENCHMARK"
-        private const val FEED_WAIT_US = 20_000L
-        private const val FEED_RETRIES = 10
+        /** 4MB covers large 4K IDR bursts without reallocating. */
+        private const val NATIVE_INPUT_CAPACITY = 4 * 1024 * 1024
+        /** Non-blocking: RAOP mirror thread must keep up with RTP. */
+        private const val FEED_WAIT_US = 0L
+        private const val FEED_RETRIES = 12
+        /** First keyframe may need a brief wait while the decoder warms up. */
+        private const val FIRST_FEED_WAIT_US = 2_000L
         private const val FIRST_FEED_RETRIES = 50
     }
 }

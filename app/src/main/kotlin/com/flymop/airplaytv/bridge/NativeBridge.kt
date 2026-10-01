@@ -20,6 +20,8 @@ object NativeBridge {
     external fun nativeDestroy(handle: Long)
 
     external fun nativeSetDisplaySize(handle: Long, w: Int, h: Int, fps: Int)
+    /** Register a direct ByteBuffer that native mirror frames are memcpy'd into. */
+    external fun nativeSetVideoInputBuffer(handle: Long, buffer: java.nio.ByteBuffer?)
     external fun nativeSetPlist(handle: Long, key: String, value: Int)
     external fun nativeSetH265Enabled(handle: Long, enabled: Boolean)
     external fun nativeSetCodecs(handle: Long, alac: Boolean, aac: Boolean)
