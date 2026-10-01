@@ -5,6 +5,7 @@
     <string name="server_name_label">Device Name:</string>
     <string name="ip_address_label">IP Address:</string>
     <string name="port_label">Port:</string>
+    <string name="how_to_connect">How to Connect</string>
     <string name="step_1_title">Same Wi-Fi Network</string>
     <string name="step_1_desc">Connect iPhone, iPad, or Mac to the same network</string>
     <string name="step_2_title">Open Control Center</string>
@@ -14,8 +15,37 @@
     <string name="status_broadcasting">Ready to Cast • Bonjour Active</string>
     <string name="pin_code_title">AirPlay Security PIN</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_overlay_title">AirPlay TV Settings</string>
+    <string name="settings_close">Close</string>
     <string name="low_latency">Low Latency Mode</string>
     <string name="show_hud">Show Performance HUD</string>
+
+    <!-- Settings rows -->
+    <string name="setting_device_name">Device Name</string>
+    <string name="setting_device_name_desc">Click to rename broadcast service</string>
+    <string name="setting_hud">Performance HUD</string>
+    <string name="setting_hud_desc">Show live FPS, bitrate, and audio cushion</string>
+    <string name="setting_low_latency">Ultra-Low Latency Audio</string>
+    <string name="setting_low_latency_desc">Google Oboe AAudio game performance path</string>
+    <string name="setting_h265">H.265 / HEVC Decoding</string>
+    <string name="setting_h265_desc">Hardware video acceleration up to 4K</string>
+    <string name="setting_max_fps">Max Frame Rate</string>
+    <string name="setting_max_fps_desc">Target video frame rate limit</string>
+    <string name="setting_resolution">Resolution Limit</string>
+    <string name="setting_resolution_desc">Display resolution mode</string>
+    <string name="setting_pin">PIN Pairing Security</string>
+    <string name="setting_pin_desc">Require 4-digit code on TV to pair</string>
+    <string name="setting_language">Language</string>
+    <string name="setting_language_desc">App display language</string>
+    <string name="language_english">English</string>
+    <string name="language_zh_cn">简体中文</string>
+    <string name="fps_value">%1$d FPS</string>
+    <string name="resolution_auto">Auto</string>
+
+    <!-- Dialogs -->
+    <string name="edit_device_name_title">Edit Device Name</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
 
     <!-- Notification -->
     <string name="notification_channel">AirPlay Service</string>

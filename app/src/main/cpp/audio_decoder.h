@@ -118,6 +118,11 @@ struct LatencyProbe {
         return (size_t)(mWrite.load(std::memory_order_relaxed) -
                         mRead.load(std::memory_order_relaxed));
     }
+
+    void reset() {
+        mWrite.store(0, std::memory_order_relaxed);
+        mRead.store(0, std::memory_order_relaxed);
+    }
 };
 
 // decodes one encoded airplay audio packet and pushes PCM onto the timeline
@@ -126,6 +131,8 @@ public:
     virtual ~Decoder() = default;
     // called on RAOP receive thread; returns false = non-critical decode error
     virtual bool decode(const uint8_t *data, size_t len, int64_t ptsNs) = 0;
+    // discard in-flight codec state (e.g. after RAOP FLUSH / seek); default no-op
+    virtual void flush() {}
 };
 
 // 24-byte ALACSpecificConfig "magic cookie" (big-endian)
@@ -189,6 +196,18 @@ public:
         // still queue packets that are too large, but truncate them and report as error
         return AMediaCodec_queueInputBuffer(mCodec, (size_t)ii, 0, n, (uint64_t)(ptsNs / 1000), 0) ==
                    AMEDIA_OK && n == len;
+    }
+
+    // stop drain, flush codec buffers, restart drain so stale PCM cannot re-enter the ring
+    void flush() override {
+        if (mDrainThread.joinable()) {
+            mDrainRun.store(false, std::memory_order_relaxed);
+            mDrainThread.join();
+        }
+        if (mCodec) AMediaCodec_flush(mCodec);
+        mProbe.reset();
+        mDrainRun.store(true, std::memory_order_relaxed);
+        mDrainThread = std::thread(&MediaCodecDecoder::drainLoop, this);
     }
 
 private:

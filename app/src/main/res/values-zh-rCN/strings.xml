@@ -1,0 +1,64 @@
+<resources>
+    <string name="app_name">AirPlay TV</string>
+    <string name="ready_to_connect">准备连接</string>
+    <string name="connect_instruction">在 iPhone、iPad 或 Mac 的屏幕镜像或 AirPlay 中选择此设备。</string>
+    <string name="server_name_label">设备名称：</string>
+    <string name="ip_address_label">IP 地址：</string>
+    <string name="port_label">端口：</string>
+    <string name="how_to_connect">连接方法</string>
+    <string name="step_1_title">同一 Wi-Fi 网络</string>
+    <string name="step_1_desc">将 iPhone、iPad 或 Mac 连接到同一网络</string>
+    <string name="step_2_title">打开控制中心</string>
+    <string name="step_2_desc">点按屏幕镜像或 AirPlay 音频图标</string>
+    <string name="step_3_title">选择电视设备</string>
+    <string name="step_3_desc">选择此设备即可立即开始投屏</string>
+    <string name="status_broadcasting">可投屏 • Bonjour 已就绪</string>
+    <string name="pin_code_title">AirPlay 安全 PIN</string>
+    <string name="settings_title">设置</string>
+    <string name="settings_overlay_title">AirPlay TV 设置</string>
+    <string name="settings_close">关闭</string>
+    <string name="low_latency">低延迟模式</string>
+    <string name="show_hud">显示性能 HUD</string>
+
+    <!-- Settings rows -->
+    <string name="setting_device_name">设备名称</string>
+    <string name="setting_device_name_desc">点击重命名广播服务名称</string>
+    <string name="setting_hud">性能 HUD</string>
+    <string name="setting_hud_desc">显示实时帧率、码率与音频缓冲</string>
+    <string name="setting_low_latency">超低延迟音频</string>
+    <string name="setting_low_latency_desc">Google Oboe AAudio 低延迟通路</string>
+    <string name="setting_h265">H.265 / HEVC 解码</string>
+    <string name="setting_h265_desc">硬件视频加速，最高支持 4K</string>
+    <string name="setting_max_fps">最大帧率</string>
+    <string name="setting_max_fps_desc">视频帧率上限</string>
+    <string name="setting_resolution">分辨率限制</string>
+    <string name="setting_resolution_desc">显示分辨率模式</string>
+    <string name="setting_pin">PIN 配对安全</string>
+    <string name="setting_pin_desc">配对时需在电视上输入 4 位密码</string>
+    <string name="setting_language">语言</string>
+    <string name="setting_language_desc">应用界面显示语言</string>
+    <string name="language_english">English</string>
+    <string name="language_zh_cn">简体中文</string>
+    <string name="fps_value">%1$d 帧/秒</string>
+    <string name="resolution_auto">自动</string>
+
+    <!-- Dialogs -->
+    <string name="edit_device_name_title">编辑设备名称</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+
+    <!-- Notification -->
+    <string name="notification_channel">AirPlay 服务</string>
+    <string name="notification_title">AirPlay TV 运行中</string>
+    <string name="notification_text">正在接受 AirPlay 连接</string>
+    <string name="notification_pin_title">需要 AirPlay PIN</string>
+    <string name="notification_pin_text">PIN：%1$s</string>
+    <string name="stop_service">停止</string>
+
+    <!-- Music & Media -->
+    <string name="unknown_track">未知曲目</string>
+    <string name="airplay_audio_title">AirPlay 音频</string>
+    <string name="airplay_audio_subtitle">已连接设备 • 正在流式传输</string>
+    <string name="download_saved">已保存到 %1$s</string>
+    <string name="download_failed">下载失败</string>
+</resources>
