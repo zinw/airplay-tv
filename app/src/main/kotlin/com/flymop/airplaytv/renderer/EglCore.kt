@@ -9,7 +9,7 @@ import android.view.Surface
 
 class EglCore : AutoCloseable {
 
-    private val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+    val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
     private val config: EGLConfig
     private val context: EGLContext
     private val pbuffer: EGLSurface

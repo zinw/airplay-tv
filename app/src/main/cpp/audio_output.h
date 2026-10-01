@@ -114,24 +114,43 @@ private:
 
     bool openLocked() {  // caller holds mLock
         // see: https://developer.android.com/games/sdk/oboe/low-latency-audio
-        oboe::AudioStreamBuilder b;
-        b.setDirection(oboe::Direction::Output)
-            ->setSharingMode(oboe::SharingMode::Shared)
-            ->setFormat(oboe::AudioFormat::I16)
-            ->setChannelCount(mChannels)
-            ->setSampleRate(mSampleRate)
-            ->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Medium)
-            ->setContentType(oboe::ContentType::Music)
-            ->setDataCallback(mCallbacks)
-            ->setErrorCallback(mCallbacks);
+        auto build = [&](oboe::SharingMode sharing) {
+            oboe::AudioStreamBuilder b;
+            b.setDirection(oboe::Direction::Output)
+                ->setSharingMode(sharing)
+                ->setFormat(oboe::AudioFormat::I16)
+                ->setChannelCount(mChannels)
+                ->setSampleRate(mSampleRate)
+                ->setSampleRateConversionQuality(
+                    mLowLatency ? oboe::SampleRateConversionQuality::Fastest
+                                : oboe::SampleRateConversionQuality::Medium)
+                ->setContentType(oboe::ContentType::Music)
+                ->setDataCallback(mCallbacks)
+                ->setErrorCallback(mCallbacks);
+            if (mLowLatency) {
+                // game use case may enable extra latency optimizations
+                b.setPerformanceMode(oboe::PerformanceMode::LowLatency)
+                    ->setUsage(oboe::Usage::Game);
+            } else {
+                // media use case may have better quality and lower power
+                b.setPerformanceMode(oboe::PerformanceMode::PowerSaving)
+                    ->setUsage(oboe::Usage::Media);
+            }
+            return b.openStream(mStream);
+        };
+
+        // Exclusive shaves mixer latency when the TV DAC allows it; fall back to Shared.
+        oboe::Result r = oboe::Result::ErrorNull;
         if (mLowLatency) {
-            // game use case may enable extra latency optimizations
-            b.setPerformanceMode(oboe::PerformanceMode::LowLatency)->setUsage(oboe::Usage::Game);
+            r = build(oboe::SharingMode::Exclusive);
+            if (r != oboe::Result::OK) {
+                mLog->info("Oboe Exclusive unavailable (%s); falling back to Shared",
+                           oboe::convertToText(r));
+                r = build(oboe::SharingMode::Shared);
+            }
         } else {
-            // media use case may have better quality and lower power
-            b.setPerformanceMode(oboe::PerformanceMode::PowerSaving)->setUsage(oboe::Usage::Media);
+            r = build(oboe::SharingMode::Shared);
         }
-        oboe::Result r = b.openStream(mStream);
         if (r != oboe::Result::OK) {
             mLog->error("Failed to open Oboe stream: %s", oboe::convertToText(r));
             return false;
@@ -149,9 +168,11 @@ private:
         const char *api = aaudio ? "AAudio"
                         : mStream->getAudioApi() == oboe::AudioApi::OpenSLES ? "OpenSLES" : "?";
         const bool lowLatency = mStream->getPerformanceMode() == oboe::PerformanceMode::LowLatency;
+        const bool exclusive = mStream->getSharingMode() == oboe::SharingMode::Exclusive;
         const bool mmap = aaudio && oboe::OboeExtensions::isMMapUsed(mStream.get());
-        mLog->info("Oboe out: %s%s, mmap=%s, buffer=%d/%d frames, burst=%d, %d Hz",
-                  api, lowLatency ? " (low-latency)" : "", mmap ? "yes" : "no",
+        mLog->info("Oboe out: %s%s, share=%s, mmap=%s, buffer=%d/%d frames, burst=%d, %d Hz",
+                  api, lowLatency ? " (low-latency)" : "",
+                  exclusive ? "exclusive" : "shared", mmap ? "yes" : "no",
                   mStream->getBufferSizeInFrames(), mStream->getBufferCapacityInFrames(),
                   mStream->getFramesPerBurst(), mStream->getSampleRate());
         // adaptive tuner needs final buffer size

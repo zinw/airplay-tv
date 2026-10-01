@@ -144,7 +144,7 @@ private:
         return (size_t)sampleRate * ms / 1000 * channels;
     }
 
-    static constexpr int MIN_CUSHION_MS = 0;             // algorithm already enforces effective floor
+    static constexpr int MIN_CUSHION_MS = 20;            // floor prevents chronic underruns on TV SoCs
     static constexpr int MAX_CUSHION_MS = 1000;
     static constexpr int BUCKET_MS = 5;                  // histogram granularity
     static constexpr int NBUCKETS = MAX_CUSHION_MS / BUCKET_MS;
@@ -409,7 +409,7 @@ private:
     static constexpr int TRIM_FLOOR_MS = 30;             // min trim point even for tiny cushion
     static constexpr int TRIM_THROTTLE_MS = 2000;        // min spacing between trims, and after underrun
     static constexpr int64_t TRIM_THROTTLE_NS = (int64_t)TRIM_THROTTLE_MS * 1'000'000LL;
-    static constexpr int TRIM_SUSTAIN_MS = 2000;         // backlog must exceed cap this long before trim
+    static constexpr int TRIM_SUSTAIN_MS = 1000;         // backlog must exceed cap this long before trim
     static constexpr int64_t TRIM_SUSTAIN_NS = (int64_t)TRIM_SUSTAIN_MS * 1'000'000LL;
     static constexpr int POST_FLUSH_PRIME_MS = 40;       // short prime after seek / episode FLUSH
 

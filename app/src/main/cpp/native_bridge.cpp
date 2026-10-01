@@ -228,6 +228,16 @@ Java_com_flymop_airplaytv_bridge_NativeBridge_nativeSetDisplaySize(
     raop_set_plist(ctx->raop, "refreshRate", fps);
 }
 
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_flymop_airplaytv_bridge_NativeBridge_nativeSetVideoInputBuffer(
+        JNIEnv *env, jobject thiz, jlong handle, jobject directBuf) {
+
+    server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
+    if (!ctx) return;
+    android_callbacks_set_video_input_buffer(&ctx->cb_ctx, env, directBuf);
+}
+
 /* Returns a HashMap<String, String> of TXT records */
 static jobject _build_txt_map(JNIEnv *env, dnssd_t *dnssd, int is_raop) {
     jclass mapClass = env->FindClass("java/util/HashMap");

@@ -394,6 +394,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             _failStart()
             return
         }
+        NativeBridge.nativeSetVideoInputBuffer(nativeHandle, videoRenderer.nativeInputBuffer)
         audioRenderer.attachEngine(nativeHandle)
 
         // apply settings from preferences
@@ -650,8 +651,12 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     // RaopCallbackHandler (called from native threads)
 
-    override fun onVideoData(data: ByteArray, ntpTimeNs: Long, isH265: Boolean) {
-        videoRenderer.feedFrame(data, ntpTimeNs, isH265)
+    override fun onVideoData(size: Int, ntpTimeNs: Long, isH265: Boolean) {
+        videoRenderer.feedFrame(size, ntpTimeNs, isH265)
+    }
+
+    override fun onVideoFlush() {
+        videoRenderer.flushSession()
     }
 
     override fun onVideoSessionPoll() {

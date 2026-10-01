@@ -2,6 +2,7 @@ package com.flymop.airplaytv.renderer
 
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
+import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
@@ -34,6 +35,7 @@ class VideoPipeline {
     private var texVbo = 0
     private val texMatrix = FloatArray(16)
     private var hasFrame = false
+    private var lastFrameNs = 0L
 
     private var surfaceTexture: SurfaceTexture? = null
     var inputSurface: Surface? = null; private set
@@ -139,12 +141,14 @@ class VideoPipeline {
             egl.makeCurrent()
             st.updateTexImage()
             hasFrame = true
+            lastFrameNs = st.timestamp
             return
         }
         egl.makeCurrent(window)
         st.updateTexImage()
         st.getTransformMatrix(texMatrix)
         hasFrame = true
+        lastFrameNs = st.timestamp
         _render()
     }
 
@@ -168,6 +172,10 @@ class VideoPipeline {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         GLES20.glDisableVertexAttribArray(aPos)
         GLES20.glDisableVertexAttribArray(aTex)
+        // Help SurfaceFlinger pick the right VSYNC slot for this decoded frame.
+        if (lastFrameNs > 0L) {
+            EGLExt.eglPresentationTimeANDROID(egl!!.display, window, lastFrameNs)
+        }
         egl?.swap(window)
     }
 
