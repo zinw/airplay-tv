@@ -166,6 +166,19 @@ adb logcat -v time -s VideoRenderer VideoPipeline MediaCodec C2Amlogic
 ```
 - Logs hardware decoder initialization (`c2.amlogic.hevc.decoder`, `c2.android.avc.decoder`), keyframe NAL detection, and OpenGL ES render timing.
 
+#### Mirror picture QA: mosaic vs black (Honor / arm64)
+```bash
+adb logcat -s VideoRenderer:I
+```
+| Symptom | What you see | Logcat signals |
+| --- | --- | --- |
+| **Black after rename** | Cold start OK; change device name / toggle H.265 etc. then remirror → full black; force-stop app fixes it | Missing `VIDEO_SERVER_RESET` / `VIDEO_MIRROR_START` after restart, or `VIDEO_CODEC_THREAD recreate`; no `VIDEO_FIRST_FRAME` on reconnect |
+| **Black (other)** | Surface blank after connect / flush | Missing `VIDEO_FIRST_FRAME`, or long `VIDEO_AWAIT_KEYFRAME` without `VIDEO_KEYFRAME_START` |
+| **Mosaic / stale tiles** | Picture up but partial regions stop refreshing | `VIDEO_FIRST_FRAME` already happened; `VIDEO_DROP_RESTART` / `Decoder input queue full` |
+| Healthy | Live picture | `VIDEO_MIRROR_START` → `VIDEO_KEYFRAME_START` → `VIDEO_FIRST_FRAME` (after rename also expect `VIDEO_SERVER_RESET`) |
+
+**Rename repro:** Settings → Device name → save → remirror from iPhone. Expect picture (not black). Do **not** reintroduce soft-flush / IDR-only / suppress-render (PR #7/#8).
+
 ### D. Discovery & Background Service
 ```bash
 adb logcat -v time -s AirPlayService NsdServiceManager

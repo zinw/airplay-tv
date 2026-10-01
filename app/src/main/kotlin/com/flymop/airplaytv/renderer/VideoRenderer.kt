@@ -25,6 +25,15 @@ import java.util.concurrent.atomic.AtomicBoolean
  * the RAOP thread is not blocked in dequeueOutputBuffer. Soft-flush, await-IDR-only,
  * mid-GOP desync gates, and suppress-render-until-IDR (PR #7/#8) are intentionally gone —
  * those caused mosaic then full black on Honor Smart Screen.
+ *
+ * Mosaic / stale tiles (v1.0.1–1.0.4): PR #3 zero-wait (and still-short) feed polls drop
+ * mid-GOP NALs; continuing to feed P-frames paints HW decoder corruption as tiles. We use
+ * a modest poll budget (still << upstream 20ms×10) and **hard-stop** the codec after any
+ * feed drop so the next SPS|IDR restarts cleanly — picture may freeze briefly, never blank.
+ *
+ * Rename → reconnect black (v1.0.4): [AirPlayService.restartServer] used to call [release],
+ * which quit the codec HandlerThread and dropped the GL display bind. Force-stop fixed it
+ * because a new process rebuilt everything. Use [resetForServerRestart] instead.
  */
 class VideoRenderer(ctx: Context) {
 
@@ -43,8 +52,10 @@ class VideoRenderer(ctx: Context) {
     private var firstFrameQueued = false
     private var loggedFirstFrame = false
 
-    private val codecThread = HandlerThread("video-codec").also { it.start() }
-    private val codecHandler = Handler(codecThread.looper)
+    // Must stay alive across server rename/restart — release() quit the thread once and
+    // left MediaCodec.Callback dead until process death (Honor rename→reconnect black).
+    private var codecThread = HandlerThread("video-codec").also { it.start() }
+    private var codecHandler = Handler(codecThread.looper)
     private val freeInputs = ArrayBlockingQueue<Int>(64)
     private val codecAlive = AtomicBoolean(false)
 
@@ -116,12 +127,39 @@ class VideoRenderer(ctx: Context) {
 
     // codec per mirror session; pipeline persists across sessions
     fun startSession() = synchronized(lock) {
+        ensureCodecThreadAlive()
+        // Clean slate for a new mirror — do not blank the Surface (no suppress-render).
+        stopCodec()
+        rebindDisplaySurfaceLocked()
         _resetStats()
         loggedFirstFrame = false
-        Log.i(TAG, "VIDEO_MIRROR_START")
+        Log.i(TAG, "VIDEO_MIRROR_START displayBound=${displaySurface?.isValid == true}")
     }
 
     fun stopSession() = synchronized(lock) { stopCodec() }
+
+    /**
+     * Server rename / settings restart: tear down codec + GL pipeline but keep this
+     * renderer usable. [release] must only run on service destroy — it quit the codec
+     * HandlerThread and left rename→reconnect mirror black until force-stop.
+     */
+    fun resetForServerRestart() = synchronized(lock) {
+        stopCodec()
+        val display = displaySurface
+        pipeline.release()
+        ensureCodecThreadAlive()
+        freeInputs.clear()
+        loggedFirstFrame = false
+        _resetStats()
+        if (display != null && display.isValid) {
+            displaySurface = display
+            pipeline.setDisplaySurface(display)
+        } else {
+            displaySurface = null
+            pipeline.setDisplaySurface(null)
+        }
+        Log.i(TAG, "VIDEO_SERVER_RESET displayValid=${display?.isValid == true}")
+    }
 
     /**
      * RAOP video_flush / discontinuity.
@@ -132,6 +170,23 @@ class VideoRenderer(ctx: Context) {
     fun flushSession() = synchronized(lock) {
         Log.i(TAG, "VIDEO_FLUSH hard restart (await next keyframe to start codec)")
         stopCodec()
+    }
+
+    private fun ensureCodecThreadAlive() {
+        if (codecThread.isAlive) return
+        Log.w(TAG, "VIDEO_CODEC_THREAD recreate (was quit)")
+        codecThread = HandlerThread("video-codec").also { it.start() }
+        codecHandler = Handler(codecThread.looper)
+    }
+
+    private fun rebindDisplaySurfaceLocked() {
+        val display = displaySurface
+        if (display != null && display.isValid) {
+            pipeline.setDisplaySurface(display)
+        } else if (display != null) {
+            displaySurface = null
+            pipeline.setDisplaySurface(null)
+        }
     }
 
     private fun _resetStats() {
@@ -176,10 +231,12 @@ class VideoRenderer(ctx: Context) {
             _updateStats(size)
             if (videoWidth == 0 || videoHeight == 0) return
 
+            val isKeyframe = VideoNalUtils.isKeyframe(nativeInputBuffer, size, isH265)
+
             // Upstream rule: only wait for a keyframe when (re)starting the codec.
-            // No continuous await-IDR / mid-GOP desync gate (those blanked the Surface).
+            // No continuous await-IDR / suppress-render (those blanked the Surface on Honor).
             if (codec == null || isH265 != currentH265) {
-                if (!VideoNalUtils.isKeyframe(nativeInputBuffer, size, isH265)) {
+                if (!isKeyframe) {
                     if (codec != null) {
                         Log.i(TAG, "VIDEO_AWAIT_KEYFRAME mime mismatch; stopping until keyframe")
                         stopCodec()
@@ -192,7 +249,18 @@ class VideoRenderer(ctx: Context) {
 
             try {
                 if (codec == null) startCodec(isH265)
-                _feedToCodec(size, ntpTimeNs)
+                val queued = _feedToCodec(size, ntpTimeNs, isKeyframe)
+                if (!queued) {
+                    // A gap mid-GOP leaves the HW decoder with broken refs → mosaic tiles.
+                    // Hard-stop (same as flush); next SPS|IDR restarts. Always keep rendering
+                    // whatever is already on the Surface — do not suppress to black.
+                    Log.w(
+                        TAG,
+                        "VIDEO_DROP_RESTART drops=$droppedFrames keyframe=$isKeyframe " +
+                            "(hard stop; await next keyframe)",
+                    )
+                    stopCodec()
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Codec error, resetting", e)
                 stopCodec()
@@ -200,26 +268,35 @@ class VideoRenderer(ctx: Context) {
         }
     }
 
-    private fun _feedToCodec(size: Int, ntpTimeNs: Long) {
-        val c = codec ?: return
-        // Modest poll (not 0): PR #3 zero-wait drops under load were a mosaic source.
-        // Still far below upstream's 20ms sync wait so the RAOP thread stays responsive.
-        val waitMs = if (firstFrameQueued) FEED_POLL_MS else FIRST_FEED_POLL_MS
-        val retries = if (firstFrameQueued) FEED_RETRIES else FIRST_FEED_RETRIES
+    /** @return true if the AU was queued; false if dropped (caller must recover). */
+    private fun _feedToCodec(size: Int, ntpTimeNs: Long, isKeyframe: Boolean): Boolean {
+        val c = codec ?: return false
+        // Patient vs PR #3's zero-wait (mosaic source), still << upstream 20ms×10 sync block.
+        // Keyframes after restart get a slightly longer budget so recovery AUs are not lost.
+        val waitMs = when {
+            isKeyframe && !firstFrameQueued -> KEYFRAME_FEED_POLL_MS
+            firstFrameQueued -> FEED_POLL_MS
+            else -> FIRST_FEED_POLL_MS
+        }
+        val retries = when {
+            isKeyframe && !firstFrameQueued -> KEYFRAME_FEED_RETRIES
+            firstFrameQueued -> FEED_RETRIES
+            else -> FIRST_FEED_RETRIES
+        }
         repeat(retries) {
             val idx = freeInputs.poll(waitMs, TimeUnit.MILLISECONDS) ?: return@repeat
             val buf = try {
                 c.getInputBuffer(idx)
             } catch (e: Exception) {
                 Log.w(TAG, "getInputBuffer($idx) failed", e)
-                return
-            } ?: return
+                return false
+            } ?: return false
             buf.clear()
             if (buf.remaining() < size) {
                 Log.w(TAG, "Codec input buffer too small (${buf.remaining()} < $size); dropping")
                 c.queueInputBuffer(idx, 0, 0, 0, 0)
                 droppedFrames++
-                return
+                return false
             }
             nativeInputBuffer.position(0)
             nativeInputBuffer.limit(size)
@@ -227,13 +304,19 @@ class VideoRenderer(ctx: Context) {
             nativeInputBuffer.clear()
             c.queueInputBuffer(idx, 0, size, ntpTimeNs / 1000, 0)
             firstFrameQueued = true
-            return
+            return true
         }
         droppedFrames++
-        Log.w(TAG, "Decoder input queue full; dropping frame. drops=$droppedFrames")
+        Log.w(
+            TAG,
+            "Decoder input queue full; dropping frame. drops=$droppedFrames keyframe=$isKeyframe",
+        )
+        return false
     }
 
     private fun startCodec(h265: Boolean) {
+        ensureCodecThreadAlive()
+        rebindDisplaySurfaceLocked()
         pipeline.start()
         pipeline.setVideoSize(videoWidth, videoHeight)
         val s = pipeline.inputSurface ?: return
@@ -421,10 +504,16 @@ class VideoRenderer(ctx: Context) {
         private const val BENCH_TAG = "BENCHMARK"
         /** 4MB covers large 4K IDR bursts without reallocating. */
         private const val NATIVE_INPUT_CAPACITY = 4 * 1024 * 1024
-        /** Small poll — avoid PR #3's zero-wait drops that fed mosaic; still << upstream 20ms. */
-        private const val FEED_POLL_MS = 2L
-        private const val FEED_RETRIES = 10
-        private const val FIRST_FEED_POLL_MS = 2L
-        private const val FIRST_FEED_RETRIES = 50
+        /**
+         * Steady-state feed budget ≈ 60ms (5ms×12). Upstream used 20ms×10 sync (~200ms);
+         * PR #3 used 0×12. 60ms cuts mid-GOP drops without pinning the RAOP thread that long.
+         */
+        private const val FEED_POLL_MS = 5L
+        private const val FEED_RETRIES = 12
+        private const val FIRST_FEED_POLL_MS = 5L
+        private const val FIRST_FEED_RETRIES = 40
+        /** First keyframe after (re)start — give async input callbacks time to refill. */
+        private const val KEYFRAME_FEED_POLL_MS = 8L
+        private const val KEYFRAME_FEED_RETRIES = 40
     }
 }
