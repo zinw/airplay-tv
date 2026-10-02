@@ -334,13 +334,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             toggleHud()
         }
 
-        // Row: Low-Latency Audio (hot-applied via audioConfigFlow — no session tear-down)
-        binding.rowSettingLowLatency.setOnClickListener {
-            val newState = !binding.switchLowLatency.isChecked
-            binding.switchLowLatency.isChecked = newState
-            prefs.edit().putBoolean(Prefs.LOW_LATENCY, newState).apply()
-        }
-
         // Row: H.265 Hardware Video
         binding.rowSettingH265.setOnClickListener {
             val newState = !binding.switchH265.isChecked
@@ -424,7 +417,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun bindSettingsFromPrefs(prefs: android.content.SharedPreferences) {
         binding.tvSettingDeviceNameVal.text = Prefs.getServerName(prefs)
         binding.switchHud.isChecked = isHudVisible
-        binding.switchLowLatency.isChecked = prefs.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY)
         binding.switchH265.isChecked = prefs.getBoolean(Prefs.H265_ENABLED, Prefs.DEF_H265_ENABLED)
         binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
         binding.switchOverscan.isChecked = prefs.getBoolean(Prefs.OVERSCANNED, Prefs.DEF_OVERSCANNED)

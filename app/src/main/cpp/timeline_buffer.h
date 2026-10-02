@@ -318,8 +318,10 @@ public:
         if (mFlushRequested.exchange(false, std::memory_order_acq_rel)) {
             // Discard only pre-FLUSH samples; keep PCM written after requestFlush().
             mRing.skipThrough(mFlushThroughWrite.load(std::memory_order_acquire));
-            mPriming = true;
-            mPostFlushPrime = true;
+            // UxPlay-style playthrough: do NOT enter silent priming after FLUSH — keep
+            // feeding the output callback. Brief underrun pads one callback if empty.
+            mPriming = false;
+            mPostFlushPrime = false;
             mPostFlushCatchUpUntilNs = now + POST_FLUSH_CATCHUP_NS;
             mPrimeSilenceFrames = 0;
             mAboveCapSinceNs = 0;
@@ -410,9 +412,8 @@ public:
     // concurrently with write()
     void reanchorTracker() { mTracker.resetToFloor(); }
 
-    // producer (or same thread as write): request consumer to discard pre-FLUSH backlog
-    // and reprime with a short post-flush cushion. safe while Oboe is reading.
-    // Post-FLUSH writes are kept (see skipThrough) so mirror next-episode audio is not muted.
+    // producer (or same thread as write): request consumer to discard pre-FLUSH backlog.
+    // UxPlay-style: consumer clears the ring without entering a silent priming gate.
     void requestFlush() {
         mExpectedPtsNs = 0;
         mTracker.resetToFloor();
