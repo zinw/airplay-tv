@@ -361,8 +361,8 @@ public:
         }
 
         // prebuffer: hold output until cushion fills, builds jitter headroom.
-        // after an intentional flush (seek / next episode), prime with a short floor so
-        // we do not wait up to ~2x the adaptive cushion (can be 1–2s of silence)
+        // After RAOP FLUSH / next-episode, play as soon as any post-flush PCM arrives
+        // (primeTarget may be 0) so we do not add another tens–hundreds of ms behind video.
         if (mPriming) {
             const size_t buffered = mRing.available();
             const size_t primeTarget = mPostFlushPrime
@@ -370,9 +370,9 @@ public:
                     : tuned;
             if (buffered == 0) mPrimeSilenceFrames = 0;
             else mPrimeSilenceFrames += (uint32_t)frames;
-            const uint32_t starveFrames = (uint32_t)(2 * primeTarget / mChannels);
+            const uint32_t starveFrames = (uint32_t)(2 * std::max(primeTarget, (size_t)mChannels) / mChannels);
             const bool starved = buffered > 0 && mPrimeSilenceFrames >= starveFrames;
-            if (buffered == 0 || (buffered < primeTarget && !starved)) {
+            if (buffered == 0 || (primeTarget > 0 && buffered < primeTarget && !starved)) {
                 memset(out, 0, need * sizeof(int16_t));
                 return;
             }
@@ -492,7 +492,7 @@ private:
     static constexpr int64_t TRIM_THROTTLE_NS = (int64_t)TRIM_THROTTLE_MS * 1'000'000LL;
     static constexpr int TRIM_SUSTAIN_MS = 1000;         // backlog must exceed cap this long before trim
     static constexpr int64_t TRIM_SUSTAIN_NS = (int64_t)TRIM_SUSTAIN_MS * 1'000'000LL;
-    static constexpr int POST_FLUSH_PRIME_MS = 40;       // short prime after seek / episode FLUSH
+    static constexpr int POST_FLUSH_PRIME_MS = 0;        // play ASAP after FLUSH (any PCM)
     static constexpr int POST_FLUSH_CATCHUP_MS = 3000;   // aggressive trim window after FLUSH
     static constexpr int64_t POST_FLUSH_CATCHUP_NS =
             (int64_t)POST_FLUSH_CATCHUP_MS * 1'000'000LL;
