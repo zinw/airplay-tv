@@ -1,5 +1,7 @@
 package com.flymop.airplaytv.ui
 
+import java.util.Locale
+
 /**
  * Formats the bottom-right mirror diagnostic line to match the competitor layout:
  * `decoder | rec=X.X dec=Y.Y | WxH | 5G`
@@ -27,6 +29,7 @@ object MirrorHudFormatter {
 
     fun formatFps(fps: Float?): String {
         if (fps == null || fps < 0f) return "—"
-        return "%.1f".format(fps)
+        // Always ASCII decimal point (competitor layout; avoid zh locale commas).
+        return "%.1f".format(Locale.US, fps)
     }
 }
