@@ -21,6 +21,7 @@
   * Clean, D-Pad navigable overlay for instant configuration.
   * Changing any setting (Device Name, Resolution, FPS limit, H.265, PIN, Low Latency, Overscan, Advertise Audio, Allow New Connections) immediately re-announces the server over mDNS after disconnecting active sessions — without requiring an app restart.
   * Performance HUD preference is persisted across launches; Info / Blue still toggles it during mirror.
+  * Mirror HUD layout: top-right green signal bars; bottom-right `MediaCodec | rec=/dec= | WxH | Wi‑Fi band`.
 
 ---
 
