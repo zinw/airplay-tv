@@ -426,17 +426,20 @@ public:
     void reprime() { mPriming = true; mPostFlushPrime = false; }
 
     // drop buffered audio + rebuild cushion, so resume after pause doesn't play stale
-    // tail; only while output callback is stopped (skip() is consumer-side)
-    void flushAndReprime() {
+    // tail; only while output callback is stopped (skip() is consumer-side).
+    // postFlushPrime: treat like RAOP FLUSH / next-episode (short prime + catch-up window)
+    // rather than a cold start that waits on the full adaptive cushion.
+    void flushAndReprime(bool postFlushPrime = false) {
         mRing.skip(mRing.available());
         mExpectedPtsNs = 0;
         mTracker.resetToFloor();
         mFlushRequested.store(false, std::memory_order_relaxed);
         mFlushThroughWrite.store(mRing.writePos(), std::memory_order_relaxed);
         mPriming = true;
-        mPostFlushPrime = false;
-        mPostFlushCatchUpUntilNs = 0;
-        mPostFlushGraceUntilNs.store(0, std::memory_order_relaxed);
+        mPostFlushPrime = postFlushPrime;
+        const int64_t graceUntil = postFlushPrime ? monoNs() + POST_FLUSH_CATCHUP_NS : 0;
+        mPostFlushCatchUpUntilNs = graceUntil;
+        mPostFlushGraceUntilNs.store(graceUntil, std::memory_order_relaxed);
         mPrimeSilenceFrames = 0;
         mAboveCapSinceNs = 0;
         mUnderran.store(false, std::memory_order_relaxed);

@@ -42,7 +42,7 @@
     <string name="setting_hud">性能 HUD</string>
     <string name="setting_hud_desc">投屏叠加层：信号格、解码器、帧率、分辨率、Wi‑Fi 频段</string>
     <string name="setting_low_latency">超低延迟音频</string>
-    <string name="setting_low_latency_desc">Google Oboe AAudio 低延迟通路</string>
+    <string name="setting_low_latency_desc">Google Oboe Exclusive AAudio（游戏）通路 — 更低延迟；断点时硬重启输出</string>
     <string name="setting_h265">H.265 / HEVC 解码</string>
     <string name="setting_h265_desc">硬件视频加速，最高支持 4K</string>
     <string name="setting_max_fps">最大帧率</string>
