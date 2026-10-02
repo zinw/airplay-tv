@@ -23,6 +23,9 @@
     <color name="tv_text_secondary">#A8B8C4</color>
     <color name="tv_text_muted">#6B8290</color>
     <color name="hud_bg">#B30A161E</color>
+    <!-- Mirror HUD signal bars: neon green when strong (competitor-style) -->
+    <color name="hud_signal_strong">#FF00E676</color>
+    <color name="hud_signal_weak">#66FFFFFF</color>
     <color name="pin_code_bg">#1E3344</color>
     <color name="scrim_overlay">#D90A161E</color>
     <color name="divider">#332A4558</color>

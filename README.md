@@ -165,7 +165,7 @@ adb install -r AirPlayTV-<SHORT_HASH>-release.apk
 ### 3. Adjusting Settings
 On the Ambient screen, select the **SETTINGS** button using the remote's **OK / Center** button:
 - **Device Name**: Customize the broadcast name displayed in Apple devices.
-- **Performance HUD**: Toggle real-time overlay showing FPS, resolution, bitrate, drops, and audio cushion (persisted).
+- **Performance HUD**: Toggle real-time overlay — top-right Wi‑Fi signal bars and bottom-right `decoder | rec/dec | WxH | band` line during mirror (persisted).
 - **Ultra-Low Latency Audio** / **Audio stability**: Trade delay vs glitch resistance on the Oboe path.
 - **H.265 / HEVC Decoding**: Enable/disable 4K HEVC hardware acceleration.
 - **Max Frame Rate & Resolution**: Limit stream resolution or frame rate to optimize for low-power chipsets.

@@ -13,6 +13,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Mirror video path.
@@ -67,12 +68,22 @@ class VideoRenderer(ctx: Context) {
         ByteBuffer.allocateDirect(NATIVE_INPUT_CAPACITY)
 
     // stats
+    /** Received (RAOP feed) frames per second — integer snapshot for legacy HUD / DebugInfo. */
     @Volatile var fps = 0; private set
+    /** Received FPS with one-decimal presentation (competitor-style `rec=`). */
+    @Volatile var receivedFps = 0f; private set
+    /** Decoded/presented FPS from MediaCodec output (`dec=`). */
+    @Volatile var decodedFps = 0f; private set
     @Volatile var bitrateBps = 0L; private set
     @Volatile var frameCount = 0L; private set
+    /** Friendly label e.g. `H.264 (OMX.hisi.video.decoder.avc)`. */
     @Volatile var codecName = ""; private set
+    /** Raw MediaCodec name for mirror HUD (e.g. `OMX.hisi.video.decoder.avc`). */
+    @Volatile var mediaCodecName = ""; private set
     @Volatile var droppedFrames = 0L; private set
     @Volatile var framePacingJitterUs = 0L; private set
+    val streamWidth: Int get() = videoWidth
+    val streamHeight: Int get() = videoHeight
 
     var enforceSdr = true
     var keyAllowFrameDrop = true
@@ -80,6 +91,7 @@ class VideoRenderer(ctx: Context) {
     var benchmarkLog = false
     var benchmarkLogCallback: ((String) -> Unit)? = null
     private var _framesThisSec = 0
+    private val _decodedThisSec = AtomicInteger(0)
     private var _bytesThisSec = 0L
     private var _lastStatReset = 0L
     private val _frameIntervalsNs = LongArray(120)
@@ -190,16 +202,23 @@ class VideoRenderer(ctx: Context) {
     }
 
     private fun _resetStats() {
-        fps = 0; bitrateBps = 0; frameCount = 0; codecName = ""
+        fps = 0; receivedFps = 0f; decodedFps = 0f
+        bitrateBps = 0; frameCount = 0; codecName = ""; mediaCodecName = ""
         droppedFrames = 0; framePacingJitterUs = 0
-        _framesThisSec = 0; _bytesThisSec = 0
+        _framesThisSec = 0; _decodedThisSec.set(0); _bytesThisSec = 0
+        _lastStatReset = 0L
     }
 
     private fun _updateStats(size: Int) {
         val now = System.currentTimeMillis()
+        if (_lastStatReset == 0L) _lastStatReset = now
         if (now - _lastStatReset >= 1000) {
-            fps = _framesThisSec
-            bitrateBps = _bytesThisSec * 8
+            val elapsedSec = ((now - _lastStatReset).coerceAtLeast(1)).toFloat() / 1000f
+            val decodedCount = _decodedThisSec.getAndSet(0)
+            receivedFps = _framesThisSec / elapsedSec
+            decodedFps = decodedCount / elapsedSec
+            fps = receivedFps.toInt()
+            bitrateBps = (_bytesThisSec * 8 / elapsedSec).toLong()
             framePacingJitterUs = _computeFramePacingJitterUs()
             _framesThisSec = 0
             _bytesThisSec = 0
@@ -209,6 +228,10 @@ class VideoRenderer(ctx: Context) {
         _framesThisSec++
         _bytesThisSec += size
         frameCount++
+    }
+
+    private fun _noteDecodedFrame() {
+        _decodedThisSec.incrementAndGet()
     }
 
     private fun _emitBenchmarkLine() {
@@ -383,6 +406,7 @@ class VideoRenderer(ctx: Context) {
             throw e
         }
         codec = c
+        mediaCodecName = c.name
         codecName = (if (h265) "H.265" else "H.264") + " (${c.name})"
     }
 
@@ -414,6 +438,7 @@ class VideoRenderer(ctx: Context) {
                     loggedFirstFrame = true
                     Log.i(TAG, "VIDEO_FIRST_FRAME ptsUs=${info.presentationTimeUs}")
                 }
+                _noteDecodedFrame()
                 _recordOutputFrameTime()
                 if (scheduledOutputBufferRelease) {
                     val ptsUs = info.presentationTimeUs

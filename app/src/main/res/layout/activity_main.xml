@@ -497,28 +497,42 @@
 
     </LinearLayout>
 
-    <!-- 5. Performance HUD -->
-    <LinearLayout
+    <!-- 5. Performance HUD: top-right signal bars + bottom-right diagnostic line -->
+    <FrameLayout
         android:id="@+id/hudOverlay"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_margin="24dp"
-        android:background="@drawable/bg_hud"
-        android:orientation="vertical"
-        android:padding="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false"
         android:visibility="gone">
+
+        <com.flymop.airplaytv.ui.view.SignalStrengthView
+            android:id="@+id/hudSignalBars"
+            android:layout_width="28dp"
+            android:layout_height="18dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="18dp"
+            android:layout_marginEnd="22dp"
+            android:contentDescription="@string/hud_signal_desc" />
 
         <TextView
             android:id="@+id/tvHudStats"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="1080p60 | H.264\nBitrate: 8.5 Mbps\nLatency: 28 ms\nDropped: 0"
-            android:textColor="@color/tv_accent"
-            android:textSize="12sp" />
+            android:layout_gravity="bottom|end"
+            android:layout_marginBottom="16dp"
+            android:layout_marginEnd="20dp"
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:shadowColor="#B3000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
+            android:text="— | rec=— dec=— | — | —"
+            android:textColor="@color/white"
+            android:textSize="11sp" />
 
-    </LinearLayout>
+    </FrameLayout>
 
     <!-- 6. PIN Overlay -->
     <LinearLayout
