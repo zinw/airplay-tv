@@ -188,6 +188,7 @@ public:
 
     bool decode(const uint8_t *data, size_t len, int64_t ptsNs) override {
         // Don't enqueue while a flush is holding the drain idle — avoids racing flush.
+        // (flush runs on the same RAOP thread as decode, so this is a safety net only.)
         if (mPaused.load(std::memory_order_acquire)) return false;
         ssize_t ii = AMediaCodec_dequeueInputBuffer(mCodec, 5000);
         if (ii < 0) return false;
@@ -202,16 +203,27 @@ public:
                    AMEDIA_OK && n == len;
     }
 
-    // Pause drain (no held output buffers), flush codec, resume — avoids join/recreate
-    // on every RAOP FLUSH / next-episode (~ms of pthread churn per switch).
+    // In-place codec reset: pause drain → flush → stop → start → resume.
+    // Faster than destroy/recreate (v1.0.9's 1–2s mute on Honor) and stronger than
+    // flush-only soft reset for mid-stream next-episode discontinuities.
     void flush() override {
         mPaused.store(true, std::memory_order_release);
-        // Wait until drain acknowledges it holds no output buffer (bounded by one dequeue timeout).
-        const int64_t deadlineNs = monoNs() + 50'000'000LL;  // 50ms safety cap
+        const int64_t deadlineNs = monoNs() + 25'000'000LL;  // one drain timeout + slack
         while (!mDrainIdle.load(std::memory_order_acquire) && monoNs() < deadlineNs) {
             std::this_thread::sleep_for(std::chrono::microseconds(200));
         }
-        if (mCodec) AMediaCodec_flush(mCodec);
+        if (mCodec) {
+            AMediaCodec_flush(mCodec);
+            // stop+start clears OEM decoder delay state without paying create/configure.
+            if (AMediaCodec_stop(mCodec) == AMEDIA_OK) {
+                if (AMediaCodec_start(mCodec) != AMEDIA_OK) {
+                    // start failed: leave codec stopped; engine may rebuild on errors.
+                    mProbe.reset();
+                    mPaused.store(false, std::memory_order_release);
+                    return;
+                }
+            }
+        }
         mProbe.reset();
         mPaused.store(false, std::memory_order_release);
     }
