@@ -101,12 +101,36 @@ struct AudioEngine {
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
     }
 
-    // RAOP FLUSH / seek / next-episode discontinuity: clear playout backlog + decoder delay.
-    // Request timeline flush first so any PCM the soft MediaCodec flush races out is dropped
-    // until the Oboe callback applies the discard (avoids queuing behind a stale head).
+    // RAOP FLUSH (next-episode / seek discontinuity).
+    //
+    // Soft MediaCodec flush + async ring discard is not enough on some TV SoCs
+    // (Honor X1): with Ultra-Low Latency (Oboe Exclusive / AAudio MMAP) the output
+    // keeps pulling while the decoder is mid-soft-flush, and next-episode audio stays
+    // muted ~1–2s. Seek-to-0 often pauses long enough for an underrun to reprime and
+    // "accidentally" recover — next-episode does not.
+    //
+    // Match that recovery deliberately: stop Oboe (clear HW/MMAP buffer), destroy the
+    // decoder (next packet rebuilds a fresh codec), synchronically flush+short-prime the
+    // ring, then restart Oboe. Same RAOP thread as decode(); safe vs decode().
     void flush() {
-        if (mTimeline) mTimeline->requestFlush();
-        if (mDecoder.decoder) mDecoder.decoder->flush();
+        std::lock_guard<std::mutex> lk(mRebuildLock);
+        if (mOutput && mOutputActive) {
+            mOutput->stop();
+            mOutputActive = false;
+        }
+        // Join drain thread / release codec while output is stopped so no PCM races in.
+        mDecoder = {};
+        if (mTimeline) {
+            mTimeline->flushAndReprime(/*postFlushPrime=*/true);
+        }
+        if (mOutput && mRunning) {
+            mOutputActive = mOutput->start();
+            mLog->info("audio_flush: hard restart oboe+decoder (post-flush prime, active=%d)",
+                       (int)mOutputActive);
+        } else if (mTimeline) {
+            // Output not running yet: still discard backlog for when start() opens playout.
+            mLog->info("audio_flush: decoder reset (output idle)");
+        }
     }
 
     bool copyDebug(void *dst, size_t dstLen) {

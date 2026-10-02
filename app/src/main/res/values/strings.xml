@@ -42,7 +42,7 @@
     <string name="setting_hud">Performance HUD</string>
     <string name="setting_hud_desc">Mirror overlay: signal bars, decoder, FPS, resolution, Wi‑Fi band</string>
     <string name="setting_low_latency">Ultra-Low Latency Audio</string>
-    <string name="setting_low_latency_desc">Google Oboe AAudio game performance path</string>
+    <string name="setting_low_latency_desc">Google Oboe Exclusive AAudio (game) path — lower delay; discontinuities hard-restart output</string>
     <string name="setting_h265">H.265 / HEVC Decoding</string>
     <string name="setting_h265_desc">Hardware video acceleration up to 4K</string>
     <string name="setting_max_fps">Max Frame Rate</string>
