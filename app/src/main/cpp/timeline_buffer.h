@@ -61,6 +61,20 @@ public:
         mRead.store(r + n, std::memory_order_release);
     }
 
+    // Monotonic write counter (not modulo capacity). Producer or any thread.
+    size_t writePos() const { return mWrite.load(std::memory_order_acquire); }
+
+    // Consumer: discard samples written strictly before absWritePos; keep anything
+    // the producer queued after that point (post-FLUSH PCM).
+    void skipThrough(size_t absWritePos) {
+        const size_t r = mRead.load(std::memory_order_relaxed);
+        const size_t w = mWrite.load(std::memory_order_acquire);
+        size_t target = absWritePos;
+        if (target < r) target = r;
+        if (target > w) target = w;
+        mRead.store(target, std::memory_order_release);
+    }
+
 private:
     const size_t mCapacity;
     std::unique_ptr<int16_t[]> mBuf;
@@ -231,14 +245,16 @@ public:
     // producer: push samples
     void write(const int16_t *pcm, size_t samples, int64_t ptsNs) {
         if (samples == 0) return;
-        // drop while a flush is pending so new PCM is not queued behind stale audio
-        if (mFlushRequested.load(std::memory_order_acquire)) return;
+        // Do NOT drop while a flush is pending: post-FLUSH mirror audio often arrives
+        // before the Oboe callback applies the discard. Dropping it caused 1–2s of
+        // silence at next-episode start. Consumer skipThrough() keeps only post-flush PCM.
         // pts 0 = sender clock not NTP synced yet
         if (ptsNs == 0) {
             mRing.write(pcm, samples);
             return;
         }
         const int64_t durNs = samples * NS_PER_SEC / mChannels / mSampleRate;
+        const bool grace = inPostFlushGrace();
 
         // consumer underran since last write: it already played the gap as real-time
         // silence, re-anchor so we don't also insert it here
@@ -256,10 +272,19 @@ public:
 
         const int64_t gapNs = ptsNs - mExpectedPtsNs;
 
-        // large gap: discontinuity (seek / next episode) or clock shift. discard stale
-        // backlog via consumer flush; this packet is dropped, the next post-flush packet
-        // becomes the new timeline head
+        // large gap: discontinuity (seek / next episode) or clock shift.
+        // Outside the post-FLUSH grace window, discard stale backlog via consumer flush.
+        // Inside grace (screen-mirror next-episode), cascading FLUSH + drop loops mute
+        // audio for ~1–2s while video already presents — re-anchor and keep PCM instead.
         if (gapNs > MAX_GAP_NS || gapNs < -MAX_GAP_NS) {
+            if (grace) {
+                mTracker.resetToFloor();
+                mExpectedPtsNs = 0;
+                mTracker.observe(ptsNs, monoNs(), durNs);
+                mRing.write(pcm, samples);
+                mExpectedPtsNs = ptsNs + durNs;
+                return;
+            }
             requestFlush();
             return;
         }
@@ -268,10 +293,13 @@ public:
         mTracker.observe(ptsNs, monoNs(), durNs);
 
         if (gapNs > SLACK_NS) {
-            // sender left gap: reproduce as silence so timing is exact
-            const size_t silenceFrames = (size_t)(gapNs * mSampleRate / NS_PER_SEC);
-            writeSilenceFrames(silenceFrames);
-            mMetrics.countSilence();
+            if (!grace) {
+                // sender left gap: reproduce as silence so timing is exact
+                const size_t silenceFrames = (size_t)(gapNs * mSampleRate / NS_PER_SEC);
+                writeSilenceFrames(silenceFrames);
+                mMetrics.countSilence();
+            }
+            // During grace, skip synthetic silence — it delays real PCM behind video.
         } else if (gapNs < -SLACK_NS) {
             // slot already passed (late/overlap): drop
             mMetrics.countDrop();
@@ -288,7 +316,8 @@ public:
 
         // apply producer-requested flush on the consumer side (skip is consumer-only)
         if (mFlushRequested.exchange(false, std::memory_order_acq_rel)) {
-            mRing.skip(mRing.available());
+            // Discard only pre-FLUSH samples; keep PCM written after requestFlush().
+            mRing.skipThrough(mFlushThroughWrite.load(std::memory_order_acquire));
             mPriming = true;
             mPostFlushPrime = true;
             mPostFlushCatchUpUntilNs = now + POST_FLUSH_CATCHUP_NS;
@@ -298,6 +327,7 @@ public:
         }
 
         const size_t tuned = mTracker.target();
+        const size_t cap = capOf(tuned);
         const bool postFlushCatchUp = now < mPostFlushCatchUpUntilNs;
 
         // bound latency: cap tracks tuned cushion live so a calmed link sheds latency
@@ -306,17 +336,17 @@ public:
         // most once per TRIM_THROTTLE, and not within that window of an underrun
         // (trimming while rebuilding cushion is counterproductive).
         // Exception: right after RAOP FLUSH, discontinuity bursts must shed immediately
-        // or A/V stays 0.5–2s apart until the sustain timer fires.
+        // or A/V stays 0.5–2s apart until the sustain timer fires. Leave `cap` (not bare
+        // tuned) so we do not underrun into another silent prime.
         const size_t avail = mRing.available();
         if (postFlushCatchUp) {
-            // Same ceiling as steady-state, but no 1s sustain — shed FLUSH bursts promptly.
-            if (avail > capOf(tuned)) {
-                mRing.skip(avail - tuned);
+            if (avail > cap) {
+                mRing.skip(avail - cap);
                 mMetrics.countTrim();
                 mAboveCapSinceNs = 0;
             }
         } else {
-            if (avail > capOf(tuned)) {
+            if (avail > cap) {
                 if (mAboveCapSinceNs == 0) mAboveCapSinceNs = now;
             } else {
                 mAboveCapSinceNs = 0;
@@ -347,11 +377,12 @@ public:
                 return;
             }
             // Priming does not drain the ring. A post-FLUSH RTP/decode burst can therefore
-            // grow far past primeTarget before this callback runs; start playout from the
-            // live edge (tuned cushion) so audio is not half a beat behind video.
+            // grow far past primeTarget before this callback runs. Shed down to `cap`
+            // (~2× cushion, ~80ms mirror) — tight enough for lip-sync, loose enough to
+            // avoid underrun→silent reprime.
             if (mPostFlushPrime) {
                 const size_t have = mRing.available();
-                const size_t want = std::max(primeTarget, tuned);
+                const size_t want = std::max(primeTarget, cap);
                 if (have > want) {
                     mRing.skip(have - want);
                     mMetrics.countTrim();
@@ -366,7 +397,9 @@ public:
         if (got < need) {
             memset(out + got, 0, (need - got) * sizeof(int16_t));
             mPriming = true;
-            mPostFlushPrime = false;  // underrun rebuild uses full adaptive cushion
+            // Stay on the short post-FLUSH prime during catch-up; full adaptive reprime
+            // here was a common path into multi-hundred-ms silence after hard-trim.
+            mPostFlushPrime = postFlushCatchUp;
             mLastTrimBlockNs = now;  // hold off trims while rebuilding
             mUnderran.store(true, std::memory_order_relaxed);  // producer re-anchors
             mMetrics.countUnderrun();
@@ -377,11 +410,14 @@ public:
     // concurrently with write()
     void reanchorTracker() { mTracker.resetToFloor(); }
 
-    // producer (or same thread as write): request consumer to discard backlog and
-    // reprime with a short post-flush cushion. safe while Oboe is reading.
+    // producer (or same thread as write): request consumer to discard pre-FLUSH backlog
+    // and reprime with a short post-flush cushion. safe while Oboe is reading.
+    // Post-FLUSH writes are kept (see skipThrough) so mirror next-episode audio is not muted.
     void requestFlush() {
         mExpectedPtsNs = 0;
         mTracker.resetToFloor();
+        mPostFlushGraceUntilNs.store(monoNs() + POST_FLUSH_CATCHUP_NS, std::memory_order_relaxed);
+        mFlushThroughWrite.store(mRing.writePos(), std::memory_order_release);
         mFlushRequested.store(true, std::memory_order_release);
     }
 
@@ -396,9 +432,11 @@ public:
         mExpectedPtsNs = 0;
         mTracker.resetToFloor();
         mFlushRequested.store(false, std::memory_order_relaxed);
+        mFlushThroughWrite.store(mRing.writePos(), std::memory_order_relaxed);
         mPriming = true;
         mPostFlushPrime = false;
         mPostFlushCatchUpUntilNs = 0;
+        mPostFlushGraceUntilNs.store(0, std::memory_order_relaxed);
         mPrimeSilenceFrames = 0;
         mAboveCapSinceNs = 0;
         mUnderran.store(false, std::memory_order_relaxed);
@@ -428,6 +466,10 @@ private:
 
     size_t postFlushPrimeSamples() const {
         return (size_t)mSampleRate * POST_FLUSH_PRIME_MS / 1000 * mChannels;
+    }
+
+    bool inPostFlushGrace() const {
+        return monoNs() < mPostFlushGraceUntilNs.load(std::memory_order_relaxed);
     }
 
     void writeSilenceFrames(size_t frames) {
@@ -463,8 +505,10 @@ private:
     int64_t mLastTrimBlockNs = 0;        // consumer-only: last trim/underrun time (trim throttle)
     int64_t mAboveCapSinceNs = 0;        // consumer-only: when backlog first exceeded cap (0 = under)
     int64_t mPostFlushCatchUpUntilNs = 0; // consumer-only: immediate-trim deadline after FLUSH
+    std::atomic<int64_t> mPostFlushGraceUntilNs{0}; // producer: suppress cascade flush / gap silence
     std::atomic<bool> mUnderran{false};  // consumer->producer: underrun happened
-    std::atomic<bool> mFlushRequested{false};  // producer->consumer: discard backlog
+    std::atomic<bool> mFlushRequested{false};  // producer->consumer: discard pre-FLUSH backlog
+    std::atomic<size_t> mFlushThroughWrite{0}; // writePos at requestFlush; consumer skipThrough
 
     int64_t mExpectedPtsNs = 0;          // presentation time expected at write head
 };
