@@ -203,27 +203,16 @@ public:
                    AMEDIA_OK && n == len;
     }
 
-    // In-place codec reset: pause drain → flush → stop → start → resume.
-    // Faster than destroy/recreate (v1.0.9's 1–2s mute on Honor) and stronger than
-    // flush-only soft reset for mid-stream next-episode discontinuities.
+    // In-place light reset (UxPlay does not tear down its audio pipeline on FLUSH).
+    // Pause drain → AMediaCodec_flush → resume. No stop/start/destroy (those cost
+    // hundreds of ms–seconds on some TV SoCs and created the next-episode mute window).
     void flush() override {
         mPaused.store(true, std::memory_order_release);
-        const int64_t deadlineNs = monoNs() + 25'000'000LL;  // one drain timeout + slack
+        const int64_t deadlineNs = monoNs() + 25'000'000LL;
         while (!mDrainIdle.load(std::memory_order_acquire) && monoNs() < deadlineNs) {
             std::this_thread::sleep_for(std::chrono::microseconds(200));
         }
-        if (mCodec) {
-            AMediaCodec_flush(mCodec);
-            // stop+start clears OEM decoder delay state without paying create/configure.
-            if (AMediaCodec_stop(mCodec) == AMEDIA_OK) {
-                if (AMediaCodec_start(mCodec) != AMEDIA_OK) {
-                    // start failed: leave codec stopped; engine may rebuild on errors.
-                    mProbe.reset();
-                    mPaused.store(false, std::memory_order_release);
-                    return;
-                }
-            }
-        }
+        if (mCodec) AMediaCodec_flush(mCodec);
         mProbe.reset();
         mPaused.store(false, std::memory_order_release);
     }

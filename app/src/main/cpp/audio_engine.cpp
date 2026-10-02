@@ -33,10 +33,10 @@ struct __attribute__((packed)) AudioDebugData {
 struct AudioConfig {
     const int staticCushionMs;   // 0 = adaptive tuner
     const int percentilePct;     // adaptive tuner target percentile
-    const int oboeBufferFrames;  // 0 = auto, two bursts in low-latency mode, oboe default in power save
+    const int oboeBufferFrames;  // 0 = auto (oboe/device default)
     const bool forceSwAlac;      // embedded ffmpeg software ALAC even when HW available
-    const bool realtimePriority; // decoder: request realtime priority
-    const bool lowLatency;       // low-latency decoder + oboe low-latency output
+    const bool realtimePriority; // kept for JNI compat; audio path no longer requests it
+    const bool lowLatency;       // kept for JNI compat; ignored — shared media path only
     const bool benchmarkLog;     // periodically log decoder stats
 };
 
@@ -101,16 +101,16 @@ struct AudioEngine {
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
     }
 
-    // RAOP FLUSH (next-episode / seek discontinuity).
+    // RAOP FLUSH (next-episode / seek).
     //
-    // v1.0.9 stopped Oboe and destroyed MediaCodec on every FLUSH. On Honor X1 that
-    // synchronous recreate routinely costs ~1–2s on the RAOP thread — the mute window.
-    // Keep Oboe running; reset the live codec in place; discard the ring only after the
-    // drain is paused so pre-FLUSH PCM cannot be mis-tagged as post-FLUSH.
+    // UxPlay's audio_renderer_flush() is intentionally a no-op: the GStreamer pipeline
+    // keeps running and new packets simply continue. Our equivalent: light codec reset +
+    // discard playout backlog, but do NOT stop Oboe, destroy the decoder, or enter a
+    // silent priming gate (those caused the 1–2s next-episode mute on Honor X1).
     void flush() {
         if (mDecoder.decoder) mDecoder.decoder->flush();
         if (mTimeline) mTimeline->requestFlush();
-        mLog->info("audio_flush: fast codec+ring reset (oboe kept)");
+        mLog->info("audio_flush: uxplay-style playthrough (codec light reset + ring discard)");
     }
 
     bool copyDebug(void *dst, size_t dstLen) {
@@ -153,7 +153,7 @@ struct AudioEngine {
             mDecoder = {ct, wantConfig,
                         makeDecoder(ct, wantConfig.spf, mSampleRate, mChannels, *mTimeline,
                                     mDecLatency, *mLog, mApplied->forceSwAlac,
-                                    mApplied->realtimePriority, mApplied->lowLatency)};
+                                    /*realtimePriority=*/false, /*lowLatency=*/false)};
             mRetryAtNs = mDecoder.decoder ? 0 : monoNs() + DECODER_RETRY_NS;
             // codec switch is definitely a discontinuity
             mTimeline->reanchorTracker();
@@ -177,7 +177,7 @@ private:
         mTimeline = std::make_shared<TimelineBuffer>(mSampleRate, mChannels,
                                                      cfg.staticCushionMs, cfg.percentilePct);
         mOutput = AudioOutput::create(mSampleRate, mChannels, cfg.oboeBufferFrames,
-                                      cfg.lowLatency, mTimeline, mLog);
+                                      mTimeline, mLog);
         mApplied = std::make_unique<AudioConfig>(cfg);
     }
 

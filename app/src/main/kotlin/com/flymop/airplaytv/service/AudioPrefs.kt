@@ -16,8 +16,9 @@ fun readAudioConfig(p: SharedPreferences) = AudioConfig(
             .coerceIn(0, Prefs.ADAPTIVE_PERCENTILES.size - 1)],
     oboeBufferFrames = p.getInt(Prefs.OBOE_BUFFER_FRAMES, Prefs.DEF_OBOE_BUFFER_FRAMES).coerceIn(0, 8192),
     forceSwAlac = p.getBoolean(Prefs.FORCE_SW_ALAC, Prefs.DEF_FORCE_SW_ALAC),
-    realtimePriority = p.getBoolean(Prefs.KEY_PRIORITY, Prefs.DEF_KEY_PRIORITY),
-    lowLatency = p.getBoolean(Prefs.LOW_LATENCY, Prefs.DEF_LOW_LATENCY),
+    // Shared media path only — Ultra-Low Latency / Exclusive AAudio removed (Honor FLUSH mute).
+    realtimePriority = false,
+    lowLatency = false,
     benchmarkLog = p.getBoolean(Prefs.BENCHMARK_LOG, Prefs.DEF_BENCHMARK_LOG),
 )
 

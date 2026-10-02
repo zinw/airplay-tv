@@ -42,25 +42,25 @@ private:
 };
 
 /*
- * low-latency audio output via oboe (AAudio or OpenSL ES). data callback pulls PCM from
- * TimelineBuffer; transparently handles device-loss errors (e.g. BT/headset change)
+ * Reliable PCM output via Oboe. Prefer the shared media path (UxPlay/GStreamer-like):
+ * Exclusive AAudio / Game / ultra-low-latency caused multi-second next-episode mute on
+ * Honor when combined with FLUSH recovery. Keep the graph simple and discontinuity-tolerant.
  */
 class AudioOutput {
 public:
     static std::shared_ptr<AudioOutput> create(int sampleRate, int channels, int oboeBufferFrames,
-                                               bool lowLatency,
                                                std::shared_ptr<TimelineBuffer> timeline,
                                                std::shared_ptr<LogSink> log) {
         auto out = std::make_shared<AudioOutput>(sampleRate, channels, oboeBufferFrames,
-                                                 lowLatency, std::move(timeline), std::move(log));
+                                                 std::move(timeline), std::move(log));
         out->mCallbacks->mOwner = out;
         return out;
     }
 
-    AudioOutput(int sampleRate, int channels, int oboeBufferFrames, bool lowLatency,
+    AudioOutput(int sampleRate, int channels, int oboeBufferFrames,
                 std::shared_ptr<TimelineBuffer> timeline, std::shared_ptr<LogSink> log)
         : mSampleRate(sampleRate), mChannels(channels), mOboeBufferFrames(oboeBufferFrames),
-          mLowLatency(lowLatency), mTimeline(std::move(timeline)), mLog(std::move(log)),
+          mTimeline(std::move(timeline)), mLog(std::move(log)),
           mCallbacks(std::make_shared<OboeCallbacks>(mTimeline, mLog)) {}
 
     ~AudioOutput() { stop(); }
@@ -113,91 +113,53 @@ private:
     }
 
     bool openLocked() {  // caller holds mLock
-        // see: https://developer.android.com/games/sdk/oboe/low-latency-audio
-        auto build = [&](oboe::SharingMode sharing) {
-            oboe::AudioStreamBuilder b;
-            b.setDirection(oboe::Direction::Output)
-                ->setSharingMode(sharing)
-                ->setFormat(oboe::AudioFormat::I16)
-                ->setChannelCount(mChannels)
-                ->setSampleRate(mSampleRate)
-                ->setSampleRateConversionQuality(
-                    mLowLatency ? oboe::SampleRateConversionQuality::Fastest
-                                : oboe::SampleRateConversionQuality::Medium)
-                ->setContentType(oboe::ContentType::Music)
-                ->setDataCallback(mCallbacks)
-                ->setErrorCallback(mCallbacks);
-            if (mLowLatency) {
-                // game use case may enable extra latency optimizations
-                b.setPerformanceMode(oboe::PerformanceMode::LowLatency)
-                    ->setUsage(oboe::Usage::Game);
-            } else {
-                // media use case may have better quality and lower power
-                b.setPerformanceMode(oboe::PerformanceMode::PowerSaving)
-                    ->setUsage(oboe::Usage::Media);
-            }
-            return b.openStream(mStream);
-        };
+        oboe::AudioStreamBuilder b;
+        b.setDirection(oboe::Direction::Output)
+            ->setSharingMode(oboe::SharingMode::Shared)
+            ->setPerformanceMode(oboe::PerformanceMode::None)
+            ->setUsage(oboe::Usage::Media)
+            ->setContentType(oboe::ContentType::Music)
+            ->setFormat(oboe::AudioFormat::I16)
+            ->setChannelCount(mChannels)
+            ->setSampleRate(mSampleRate)
+            ->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Medium)
+            ->setDataCallback(mCallbacks)
+            ->setErrorCallback(mCallbacks);
 
-        // Exclusive shaves mixer latency when the TV DAC allows it; fall back to Shared.
-        oboe::Result r = oboe::Result::ErrorNull;
-        if (mLowLatency) {
-            r = build(oboe::SharingMode::Exclusive);
-            if (r != oboe::Result::OK) {
-                mLog->info("Oboe Exclusive unavailable (%s); falling back to Shared",
-                           oboe::convertToText(r));
-                r = build(oboe::SharingMode::Shared);
-            }
-        } else {
-            r = build(oboe::SharingMode::Shared);
-        }
+        oboe::Result r = b.openStream(mStream);
         if (r != oboe::Result::OK) {
             mLog->error("Failed to open Oboe stream: %s", oboe::convertToText(r));
             return false;
         }
         if (mOboeBufferFrames > 0) {
             mStream->setBufferSizeInFrames(mOboeBufferFrames);
-        } else if (mLowLatency) {
-            // smallest reasonable buffer in low-latency mode
-            mStream->setBufferSizeInFrames(mStream->getFramesPerBurst() * 2);
         }
 
-        // log what we actually got: oboe may clamp the buffer, fall back to a
-        // higher-latency API, or deny the low-latency path
         const bool aaudio = mStream->getAudioApi() == oboe::AudioApi::AAudio;
         const char *api = aaudio ? "AAudio"
                         : mStream->getAudioApi() == oboe::AudioApi::OpenSLES ? "OpenSLES" : "?";
-        const bool lowLatency = mStream->getPerformanceMode() == oboe::PerformanceMode::LowLatency;
-        const bool exclusive = mStream->getSharingMode() == oboe::SharingMode::Exclusive;
-        const bool mmap = aaudio && oboe::OboeExtensions::isMMapUsed(mStream.get());
-        mLog->info("Oboe out: %s%s, share=%s, mmap=%s, buffer=%d/%d frames, burst=%d, %d Hz",
-                  api, lowLatency ? " (low-latency)" : "",
-                  exclusive ? "exclusive" : "shared", mmap ? "yes" : "no",
+        mLog->info("Oboe out: %s share=shared usage=media, buffer=%d/%d frames, burst=%d, %d Hz",
+                  api,
                   mStream->getBufferSizeInFrames(), mStream->getBufferCapacityInFrames(),
                   mStream->getFramesPerBurst(), mStream->getSampleRate());
-        // adaptive tuner needs final buffer size
         mTimeline->noteOutputBufferFrames(mStream->getBufferSizeInFrames());
         return true;
     }
 
     const int mSampleRate;
     const int mChannels;
-
     const int mOboeBufferFrames;
-    const bool mLowLatency;
 
     std::shared_ptr<TimelineBuffer> mTimeline;
     std::shared_ptr<LogSink> mLog;
     std::atomic<bool> mClosing{false};
     std::shared_ptr<OboeCallbacks> mCallbacks;
     std::shared_ptr<oboe::AudioStream> mStream;
-    std::mutex mLock;                    // guards open/close
-    int32_t mLastXrun = 0;               // debug-poll thread only
+    std::mutex mLock;
+    int32_t mLastXrun = 0;
 };
 
 inline void OboeCallbacks::onErrorAfterClose(oboe::AudioStream *, oboe::Result error) {
-    // device disconnect (e.g. BT/headset change): oboe already closed the stream, ask
-    // AudioOutput to reopen
     mLog->error("Oboe stream error: %s - reopening", oboe::convertToText(error));
     if (auto owner = mOwner.lock()) owner->reopenAfterError();
 }
