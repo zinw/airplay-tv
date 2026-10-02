@@ -24,6 +24,7 @@
     <string name="app_version_label">版本 %1$s (%2$d)</string>
     <string name="low_latency">低延迟模式</string>
     <string name="show_hud">显示性能 HUD</string>
+    <string name="hud_signal_desc">Wi‑Fi 信号强度</string>
 
     <!-- Home meta chips -->
     <string name="home_pin_on">PIN 已开启</string>
@@ -39,7 +40,7 @@
     <string name="setting_device_name">设备名称</string>
     <string name="setting_device_name_desc">投屏时显示的名称</string>
     <string name="setting_hud">性能 HUD</string>
-    <string name="setting_hud_desc">显示实时帧率、码率与音频缓冲</string>
+    <string name="setting_hud_desc">投屏叠加层：信号格、解码器、帧率、分辨率、Wi‑Fi 频段</string>
     <string name="setting_low_latency">超低延迟音频</string>
     <string name="setting_low_latency_desc">Google Oboe AAudio 低延迟通路</string>
     <string name="setting_h265">H.265 / HEVC 解码</string>

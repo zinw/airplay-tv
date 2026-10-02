@@ -196,12 +196,12 @@ AirPlay TV includes a built-in real-time diagnostics overlay (Performance HUD).
 2. Or press the **MENU** / **BLUE** color key on your TV remote controller during active playback.
 
 ### HUD Metrics Explained:
-- **Video FPS**: Current frames per second decoded and rendered to the surface.
-- **Video Bitrate**: Real-time RTP video stream bitrate (Mbps).
-- **Codec**: Active hardware decoder format (`H.264 / AVC` vs `H.265 / HEVC`).
-- **Audio Backlog**: Unplayed PCM data held in the native ring buffer (ms).
-- **Tuned Cushion**: Target dynamic jitter cushion computed from network arrival statistics (ms).
-- **Audio XRuns / Drops / Trims**: Number of audio packet underflows or buffer adjustments performed to eliminate delay drift.
+- **Signal bars** (top-right): Wi‑Fi RSSI mapped to 0–3 neon-green bars.
+- **Decoder**: Active MediaCodec name (e.g. `OMX.hisi.video.decoder.avc`).
+- **rec / dec**: Received (RAOP feed) vs decoded/presented frames per second.
+- **Resolution**: Live mirror stream width×height.
+- **Band**: Connected Wi‑Fi frequency band (`5G` = 5 GHz, `2.4G`, `6G`). Missing values show as `—`.
+- Legacy extras (bitrate, drops, audio cushion) remain available via logcat / `collectDebugInfo()`.
 
 ---
 

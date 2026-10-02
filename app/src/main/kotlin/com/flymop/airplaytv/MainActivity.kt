@@ -34,8 +34,10 @@ import androidx.lifecycle.lifecycleScope
 import com.flymop.airplaytv.R
 import com.flymop.airplaytv.databinding.ActivityMainBinding
 import com.flymop.airplaytv.Prefs
+import com.flymop.airplaytv.net.WifiLinkMetrics
 import com.flymop.airplaytv.service.AirPlayService
 import com.flymop.airplaytv.service.AirPlayService.ServerState
+import com.flymop.airplaytv.ui.MirrorHudFormatter
 import com.flymop.airplaytv.update.ApkInstaller
 import com.flymop.airplaytv.update.AppUpdateChecker
 import kotlinx.coroutines.Job
@@ -756,23 +758,53 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun updateHud() {
-        val service = airPlayService ?: return
-        val vRenderer = service.videoRenderer
-        val aRenderer = service.audioRenderer
-        val audioDbg = aRenderer.audioDebug()
-        val res = service.videoResolution.value.ifBlank { "—" }
-        val videoStats =
-            "${vRenderer.codecName.ifBlank { "—" }} | $res | ${vRenderer.fps} fps | " +
-                "${"%.1f".format((vRenderer.bitrateBps / 1000.0) / 1000.0)} Mbps | " +
-                "Drops: ${vRenderer.droppedFrames} | Conn: ${service.connectionCount.value}"
-        val audioStats = if (audioDbg != null) {
-            "Audio: ${aRenderer.codecLabel} | Cushion: ${audioDbg.tunedCushionMs}ms | " +
-                "XRuns: ${audioDbg.xrun} | Underruns: ${audioDbg.underruns}"
-        } else {
-            "Audio: ${aRenderer.codecLabel.ifBlank { "idle" }}"
+        val service = airPlayService
+        val wifi = WifiLinkMetrics.snapshot(this)
+        binding.hudSignalBars.level = wifi.signalBars ?: 0
+
+        if (service == null) {
+            binding.tvHudStats.text = MirrorHudFormatter.formatLine(
+                mediaCodecName = null,
+                receivedFps = null,
+                decodedFps = null,
+                width = 0,
+                height = 0,
+                wifiBand = wifi.bandLabel,
+            )
+            return
         }
 
-        binding.tvHudStats.text = "$videoStats\n$audioStats"
+        val vRenderer = service.videoRenderer
+        val mirroring = service.mirrorRunning.value
+        val received = if (mirroring) vRenderer.receivedFps else null
+        val decoded = if (mirroring) vRenderer.decodedFps else null
+        val w = if (mirroring) vRenderer.streamWidth else 0
+        val h = if (mirroring) vRenderer.streamHeight else 0
+        // Prefer live stream size from the renderer; fall back to service resolution string.
+        val (resW, resH) = if (w > 0 && h > 0) {
+            w to h
+        } else if (mirroring) {
+            parseResolution(service.videoResolution.value)
+        } else {
+            0 to 0
+        }
+
+        binding.tvHudStats.text = MirrorHudFormatter.formatLine(
+            mediaCodecName = if (mirroring) vRenderer.mediaCodecName.ifBlank { null } else null,
+            receivedFps = received,
+            decodedFps = decoded,
+            width = resW,
+            height = resH,
+            wifiBand = wifi.bandLabel,
+        )
+    }
+
+    private fun parseResolution(raw: String): Pair<Int, Int> {
+        val parts = raw.split('x', '×', limit = 2)
+        if (parts.size != 2) return 0 to 0
+        val w = parts[0].trim().toIntOrNull() ?: return 0 to 0
+        val h = parts[1].trim().toIntOrNull() ?: return 0 to 0
+        return w to h
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {

@@ -22,7 +22,7 @@ In-app updates (Settings / home status chip) check GitHub Releases and, on restr
 | Setting | When to change it |
 |---|---|
 | Device name | Rename how the TV appears in AirPlay lists |
-| Performance HUD | Live FPS, bitrate, drops, audio cushion (Info / Blue also toggles) |
+| Performance HUD | Top-right Wi‑Fi bars + bottom-right `decoder | rec/dec | WxH | band` (Info / Blue also toggles) |
 | Ultra-low latency audio | Prefer lower delay; hot-applied without disconnecting |
 | Audio stability | Cycles toward a larger adaptive cushion (more stable, slightly higher latency); hot-applied |
 | H.265 / HEVC | Off on chipsets that glitch on HEVC mirror |
