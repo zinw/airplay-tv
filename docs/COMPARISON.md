@@ -17,7 +17,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 | Optional PIN pairing | ✅ (off by default) | ✅ | ✅ | ✅ (+ lockout) | — | ✅ | ◐ access control |
 | Resolution / FPS limits | ✅ TV settings | ✅ rich settings | — | — | — | ✅ CLI | ✅ custom resolution |
 | Overscan correction | ✅ (now in TV UI) | ✅ | — | — | — | ✅ | — |
-| Low-latency audio path | ✅ Oboe + adaptive cushion | ✅ Oboe (low-lat default off) | ◐ HW decode focus | ◐ AAC/ALAC | — | GStreamer | — |
+| Low-latency audio path | ◐ shared media Oboe (Exclusive/Game toggle removed 1.0.11) | ✅ Oboe (low-lat default off) | ◐ HW decode focus | ◐ AAC/ALAC | — | GStreamer | — |
 | Debug FPS/bitrate HUD | ✅ persisted toggle | ✅ | ❌ | ❌ | ❌ | verbose logs | — |
 | Android TV leanback UX | ✅ 10-ft D-pad | ✅ TV support | ✅ TV-first | ✅ TV/Fire TV | ✅ Google TV | Desktop | Phone/TV |
 | Picture-in-Picture | ❌ deferred | ✅ Manifest | ❌ | ❌ | — | — | — |
@@ -57,7 +57,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 | Persist Performance HUD preference | jqssun debug overlay sticks across launches; ours did not write `DEBUG_ENABLED` |
 | Expose Overscan / Allow new connections / Advertise audio / Boot start | Already wired in `Prefs` + native path; competitors surface them in UI |
 | Audio stability TV control | Expose adaptive cushion step without session tear-down (`audioConfigFlow`) |
-| Hot-apply low-latency toggle | Avoid unnecessary reconnect when only Oboe path changes |
+| Hot-apply low-latency toggle | **Removed in 1.0.11** — Exclusive AAudio fought FLUSH recovery on Honor; UxPlay-style shared media path only |
 | Disconnect before settings restart | Cleaner session teardown vs hanging iOS sockets after rename/codec changes |
 | Richer HUD (resolution + connection count) | Match competitor debug overlay usefulness |
 | User guide + comparison matrix | Docs for install / troubleshooting / deferred scope |
