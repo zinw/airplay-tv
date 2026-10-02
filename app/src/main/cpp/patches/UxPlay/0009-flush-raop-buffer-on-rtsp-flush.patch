@@ -1,0 +1,22 @@
+diff --git a/lib/raop_rtp.c b/lib/raop_rtp.c
+index 35d42df..c5128ef 100644
+--- a/lib/raop_rtp.c
++++ b/lib/raop_rtp.c
+@@ -316,8 +316,16 @@ raop_rtp_process_events(raop_rtp_t *raop_rtp, void *cb_data)
+         }
+     }
+ 
+-    /* Handle flush if requested */
++    /* Handle flush if requested.
++     * Reset raop_buffer to RTP-Info next_seq (or empty if -1). Without this,
++     * next-episode FLUSH leaves a hole at first_seqnum; dequeue stalls until
++     * the 256-slot ring fills (~2s ALAC) -- hard mute while video plays.
++     * Seek recovers via large seq auto-flush or TEARDOWN; next-ep only FLUSHes.
++     */
+     if (flush != NO_FLUSH) {
++        raop_buffer_flush(raop_rtp->buffer, flush);
++        logger_log(raop_rtp->logger, LOGGER_INFO,
++                   "raop_rtp FLUSH: raop_buffer reset to next_seq=%d", flush);
+         if (raop_rtp->callbacks.audio_flush) {
+             raop_rtp->callbacks.audio_flush(raop_rtp->callbacks.cls);
+         }
