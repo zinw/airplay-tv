@@ -10,6 +10,7 @@
 #include <string>
 
 #include "audio_time.h"
+#include "audio_flush_diag.h"
 
 /*
  * lock-free SPSC ring of int16 samples (interleaved frames); positions are
@@ -242,6 +243,8 @@ public:
 
     void noteOutputBufferFrames(int frames) { mTracker.noteOutputBufferFrames(frames); }
 
+    int channels() const { return mChannels; }
+
     // producer: push samples
     void write(const int16_t *pcm, size_t samples, int64_t ptsNs) {
         if (samples == 0) return;
@@ -251,6 +254,7 @@ public:
         // pts 0 = sender clock not NTP synced yet
         if (ptsNs == 0) {
             mRing.write(pcm, samples);
+            audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
             return;
         }
         const int64_t durNs = samples * NS_PER_SEC / mChannels / mSampleRate;
@@ -267,6 +271,7 @@ public:
             mTracker.observe(ptsNs, monoNs(), durNs);
             mRing.write(pcm, samples);
             mExpectedPtsNs = ptsNs + durNs;
+            audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
             return;
         }
 
@@ -283,6 +288,7 @@ public:
                 mTracker.observe(ptsNs, monoNs(), durNs);
                 mRing.write(pcm, samples);
                 mExpectedPtsNs = ptsNs + durNs;
+                audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
                 return;
             }
             requestFlush();
@@ -307,6 +313,7 @@ public:
         }
         mRing.write(pcm, samples);
         mExpectedPtsNs = ptsNs + durNs;
+        audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
     }
 
     // consumer: pop frames*channels samples into out, silence-padded on underrun

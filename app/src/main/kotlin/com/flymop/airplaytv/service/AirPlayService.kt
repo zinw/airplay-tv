@@ -50,6 +50,7 @@ import com.flymop.airplaytv.audio.DmapParser
 import com.flymop.airplaytv.audio.TrackInfo
 import com.flymop.airplaytv.audio.VolumeBroadcast
 import com.flymop.airplaytv.bridge.LogListener
+import com.flymop.airplaytv.diag.DiagLogShipper
 import com.flymop.airplaytv.bridge.NativeBridge
 import com.flymop.airplaytv.bridge.RaopCallbackHandler
 import com.flymop.airplaytv.discovery.NsdServiceManager
@@ -231,6 +232,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onCreate() {
         super.onCreate()
+        // TEMPORARY Honor next-ep FLUSH diag: remote ship of AirPlayAudio lines only.
+        DiagLogShipper.start()
         createNotificationChannel()
         dacpController = DacpController(this)
         dacpPlayer = DacpPlayer(
@@ -672,6 +675,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         dacpController = null
         mediaSession?.release()
         mediaSession = null
+        DiagLogShipper.stop()
         super.onDestroy()
     }
 
