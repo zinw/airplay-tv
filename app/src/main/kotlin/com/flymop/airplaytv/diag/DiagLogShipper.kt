@@ -8,12 +8,20 @@ import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * Temporary diagnostic log shipper (debug build).
@@ -24,6 +32,8 @@ object DiagLogShipper {
     // TEMPORARY debug ingest — do not document in public PR/release notes.
     private const val INGEST_URL = "https://tp.zinw.top/airplay-diag/ingest"
     private const val TOKEN = "EQSVQhiUkKHj-SpELm9r74Uh"
+    /** Only this host may use the diag-only TLS path (Honor TV CA store lacks LE YR). */
+    private const val EXPECTED_HOST = "tp.zinw.top"
 
     private const val TAG = "DiagLogShipper"
     private const val MAX_BODY = 60 * 1024
@@ -55,6 +65,33 @@ object DiagLogShipper {
     private val listeners = CopyOnWriteArrayList<OutcomeListener>()
     @Volatile var lastOutcome: Outcome? = null
         private set
+
+    /**
+     * Diag-only TLS: encrypt the session, require hostname [EXPECTED_HOST], but skip system
+     * CA path validation (Honor TV trust store rejects the current LE YR intermediate).
+     * Applied only to this ship's HttpsURLConnection — never set as JVM/app default.
+     */
+    private val diagTrustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) = Unit
+        override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {
+            if (chain.isNullOrEmpty()) {
+                throw SSLException("empty server cert chain")
+            }
+            // Present leaf must exist; CA path intentionally not checked against system store.
+            chain[0].checkValidity()
+        }
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+    }
+
+    private val diagHostnameVerifier = HostnameVerifier { hostname, _ ->
+        hostname.equals(EXPECTED_HOST, ignoreCase = true)
+    }
+
+    private val diagSslSocketFactory: SSLSocketFactory by lazy {
+        SSLContext.getInstance("TLS").apply {
+            init(null, arrayOf<TrustManager>(diagTrustManager), SecureRandom())
+        }.socketFactory
+    }
 
     fun addOutcomeListener(listener: OutcomeListener) {
         listeners.addIfAbsent(listener)
@@ -139,7 +176,13 @@ object DiagLogShipper {
     private fun postQuietly(body: String) {
         var conn: HttpURLConnection? = null
         try {
-            conn = (URL(INGEST_URL).openConnection() as HttpURLConnection).apply {
+            val url = URL(INGEST_URL)
+            if (!url.host.equals(EXPECTED_HOST, ignoreCase = true)) {
+                publishOutcome(Outcome(false, null, "ssl"))
+                Log.w(TAG, "ingest host mismatch")
+                return
+            }
+            conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true
                 connectTimeout = CONNECT_MS
@@ -147,6 +190,11 @@ object DiagLogShipper {
                 setRequestProperty("Content-Type", "text/plain; charset=utf-8")
                 setRequestProperty("X-Log-Token", TOKEN)
                 setFixedLengthStreamingMode(body.toByteArray(Charsets.UTF_8).size)
+                if (this is HttpsURLConnection) {
+                    // Per-connection only — do not touch default SSL factories.
+                    sslSocketFactory = diagSslSocketFactory
+                    hostnameVerifier = diagHostnameVerifier
+                }
             }
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = try {
