@@ -1,34 +1,39 @@
 --- a/lib/raop_buffer.c
 +++ b/lib/raop_buffer.c
-@@ -289,16 +289,27 @@
+@@ -241,12 +241,36 @@
      if (no_resend) {
          /* If we do no resends, always return the first entry */
      } else if (!entry->filled) {
 -        /* Check how much we have space left in the buffer */
 -        if (entry_count < RAOP_BUFFER_LENGTH) {
 -            /* Return nothing and hope resend gets on time */
--            {
--                int hole = raop_buffer_hole_at_head(raop_buffer);
--                audio_flush_diag_dequeue(0, raop_buffer->first_seqnum, 0, entry_count, hole, 1);
--            }
 +        /*
 +         * Hole at head. If a later packet in [first, last] is already filled,
 +         * play that now (skip the unfilled head) instead of holding silence
-+         * until the span reaches RAOP_BUFFER_LENGTH (~2.8s AAC-ELD). Filled
-+         * audio is already in the ring; there is no resend deadline.
++         * until the span reaches RAOP_BUFFER_LENGTH (~2.8s AAC-ELD).
 +         * If nothing later is filled yet, wait for the next packet to arrive.
 +         */
-+        int hole = raop_buffer_hole_at_head(raop_buffer);
++        int hole = 0;
++        unsigned short seq;
++        for (seq = raop_buffer->first_seqnum;
++             seqnum_cmp(seq, raop_buffer->last_seqnum) <= 0;
++             seq++) {
++            raop_buffer_entry_t *e = &raop_buffer->entries[seq % RAOP_BUFFER_LENGTH];
++            if (e->filled && seqnum_cmp(e->seqnum, seq) == 0) {
++                break;
++            }
++            hole++;
++            if (hole >= RAOP_BUFFER_LENGTH) {
++                break;
++            }
++        }
 +        if (hole > 0 && hole < entry_count) {
-+            /* Advance first_seqnum over the unfilled head to the first filled slot. */
 +            unsigned short skip_to = (unsigned short)(raop_buffer->first_seqnum + hole);
 +            raop_buffer->first_seqnum = skip_to;
 +            entry = &raop_buffer->entries[raop_buffer->first_seqnum % RAOP_BUFFER_LENGTH];
 +            entry_count = seqnum_cmp(raop_buffer->last_seqnum, raop_buffer->first_seqnum) + 1;
-+            /* Fall through to return the filled entry below. */
 +        } else if (entry_count < RAOP_BUFFER_LENGTH) {
 +            /* Nothing later filled — next packet simply has not arrived yet. */
-+            audio_flush_diag_dequeue(0, raop_buffer->first_seqnum, 0, entry_count, hole, 1);
              return NULL;
          }
 -        /* Risk of buffer overrun, return empty buffer */
