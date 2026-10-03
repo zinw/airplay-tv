@@ -8,6 +8,7 @@
 
 #include "log_sink.h"
 #include "timeline_buffer.h"
+#include "audio_flush_diag.h"
 
 class AudioOutput;
 
@@ -27,7 +28,21 @@ public:
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *, void *audioData,
                                           int32_t numFrames) override {
-        mTimeline->read(static_cast<int16_t *>(audioData), numFrames);
+        auto *pcm = static_cast<int16_t *>(audioData);
+        mTimeline->read(pcm, numFrames);
+        if (audio_flush_diag_active()) {
+            const int samples = numFrames * mTimeline->channels();
+            int nz = 0;
+            for (int i = 0; i < samples; ++i) {
+                if (pcm[i] != 0) {
+                    ++nz;
+                    if (nz >= 4) break;  // enough to call it audible
+                }
+            }
+            if (nz > 0) {
+                audio_flush_diag_audible("oboe_callback", nz, numFrames);
+            }
+        }
         return oboe::DataCallbackResult::Continue;
     }
 

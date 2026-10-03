@@ -15,6 +15,7 @@
 #include "audio_engine.h"
 #include "audio_decoder.h"
 #include "audio_output.h"
+#include "audio_flush_diag.h"
 #include "log_sink.h"
 #include "timeline_buffer.h"
 
@@ -111,6 +112,7 @@ struct AudioEngine {
         if (mDecoder.decoder) mDecoder.decoder->flush();
         if (mTimeline) mTimeline->requestFlush();
         mLog->info("audio_flush: light codec+ring (raop_buffer reset done in UxPlay FLUSH)");
+        audio_flush_diag_renderer_flush();
     }
 
     bool copyDebug(void *dst, size_t dstLen) {
