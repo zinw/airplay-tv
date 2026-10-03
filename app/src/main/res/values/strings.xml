@@ -38,6 +38,7 @@
     <string name="diag_ship_idle">Log: —</string>
     <string name="diag_ship_sending">Log: sending…</string>
     <string name="diag_ship_ok">Log: sent %1$d</string>
+    <string name="diag_ship_fail_detail">Log: failed %1$s</string>
     <string name="diag_ship_fail_timeout">Log: failed timeout</string>
     <string name="diag_ship_fail_dns">Log: failed DNS</string>
     <string name="diag_ship_fail_connect">Log: failed connect</string>
