@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Temporary next-episode / FLUSH diagnostic shipper (v1.0.13 debug build).
+ * Temporary next-episode audio diagnostic shipper (debug build).
  * Fire-and-forget HTTPS POST of AirPlayAudio lines only. Failures never affect playback.
  * Remove this class (and native wiring) once Honor root-cause is confirmed.
  */
@@ -58,6 +58,25 @@ object DiagLogShipper {
                     Log.w(TAG, "ship loop: ${t.message}")
                     batch.setLength(0)
                 }
+            }
+        }
+    }
+
+    /**
+     * Immediate hello so we can tell "TV cannot reach ingest" vs "diag never armed".
+     * Fire-and-forget; never throws to callers.
+     */
+    fun sendBeacon(versionName: String, versionCode: Int) {
+        start()
+        val line =
+            "BEACON hello AirPlayTV version=$versionName versionCode=$versionCode from=kotlin"
+        enqueueBatch(line)
+        // Direct one-shot so the first POST is not delayed by batch coalesce.
+        exec.execute {
+            try {
+                postQuietly(line)
+            } catch (t: Throwable) {
+                Log.w(TAG, "beacon failed: ${t.message}")
             }
         }
     }

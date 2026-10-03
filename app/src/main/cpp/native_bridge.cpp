@@ -157,6 +157,9 @@ Java_com_flymop_airplaytv_bridge_NativeBridge_nativeStart(
 
     LOGI("AirPlay server started on port %d", port);
 
+    /* TEMPORARY: native-side reachability beacon (does not depend on FLUSH). */
+    audio_flush_diag_beacon("1.0.14-native", 15);
+
     /* Register dnssd records (stored in shim, Kotlin reads them) */
     if (ctx->dnssd) {
         dnssd_register_raop(ctx->dnssd, port);

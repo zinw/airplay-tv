@@ -412,6 +412,7 @@ public:
             mLastTrimBlockNs = now;  // hold off trims while rebuilding
             mUnderran.store(true, std::memory_order_relaxed);  // producer re-anchors
             mMetrics.countUnderrun();
+            audio_flush_diag_underrun((int)need / mChannels, (int)(got / mChannels));
         }
     }
 

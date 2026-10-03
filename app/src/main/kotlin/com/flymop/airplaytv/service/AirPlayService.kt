@@ -232,8 +232,13 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onCreate() {
         super.onCreate()
-        // TEMPORARY Honor next-ep FLUSH diag: remote ship of AirPlayAudio lines only.
+        // TEMPORARY Honor next-ep audio diag: remote ship + startup beacon.
         DiagLogShipper.start()
+        val pInfo = packageManager.getPackageInfo(packageName, 0)
+        @Suppress("DEPRECATION")
+        val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode.toInt()
+        else pInfo.versionCode
+        DiagLogShipper.sendBeacon(pInfo.versionName ?: "?", vCode)
         createNotificationChannel()
         dacpController = DacpController(this)
         dacpPlayer = DacpPlayer(
@@ -456,6 +461,12 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             return
         }
         _serverPort.value = port
+        // Second beacon after native httpd is up (reachability check independent of FLUSH).
+        val pInfo = packageManager.getPackageInfo(packageName, 0)
+        @Suppress("DEPRECATION")
+        val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode.toInt()
+        else pInfo.versionCode
+        DiagLogShipper.sendBeacon("${pInfo.versionName ?: "?"}@port$port", vCode)
 
         // register mdns services
         val raopTxt = NativeBridge.nativeGetRaopTxtRecords(nativeHandle) ?: emptyMap()

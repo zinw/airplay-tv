@@ -11,7 +11,7 @@ index c86393f..5226843 100644
  #include "http_handlers.h"
  
 diff --git a/lib/raop_buffer.c b/lib/raop_buffer.c
-index d0ed368..6298ffd 100644
+index d0ed368..6b3dc71 100644
 --- a/lib/raop_buffer.c
 +++ b/lib/raop_buffer.c
 @@ -32,6 +32,7 @@
@@ -82,48 +82,38 @@ index d0ed368..6298ffd 100644
          raop_buffer_flush(raop_buffer, seqnum);
      }
  
-@@ -230,9 +277,13 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
- 
-     /* Calculate number of entries in the current buffer */
-     short entry_count = seqnum_cmp(raop_buffer->last_seqnum, raop_buffer->first_seqnum)+1;
-+    const int diag = audio_flush_diag_active();
+@@ -233,6 +280,7 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
  
      /* Cannot dequeue from empty buffer */
      if (raop_buffer->is_empty || entry_count <= 0) {
-+        if (diag) {
-+            audio_flush_diag_dequeue(0, 0, 0, entry_count, 0, 0);
-+        }
++        audio_flush_diag_dequeue(0, 0, 0, entry_count, 0, 0);
          return NULL;
      }
  
-@@ -244,6 +295,10 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
+@@ -244,6 +292,10 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
          /* Check how much we have space left in the buffer */
          if (entry_count < RAOP_BUFFER_LENGTH) {
              /* Return nothing and hope resend gets on time */
-+            if (diag) {
++            {
 +                int hole = raop_buffer_hole_at_head(raop_buffer);
 +                audio_flush_diag_dequeue(0, raop_buffer->first_seqnum, 0, entry_count, hole, 1);
 +            }
              return NULL;
          }
          /* Risk of buffer overrun, return empty buffer */
-@@ -252,6 +307,9 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
+@@ -252,6 +304,7 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
      /* Update buffer and validate entry */
      raop_buffer->first_seqnum += 1;
      if (!entry->filled) {
-+        if (diag) {
-+            audio_flush_diag_dequeue(0, (unsigned)(raop_buffer->first_seqnum - 1), 0, entry_count, 1, 0);
-+        }
++        audio_flush_diag_dequeue(0, (unsigned)(raop_buffer->first_seqnum - 1), 0, entry_count, 1, 0);
          return NULL;
      }
      entry->filled = 0;
-@@ -263,6 +321,9 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
+@@ -263,6 +316,7 @@ raop_buffer_dequeue(raop_buffer_t *raop_buffer, unsigned int *length, uint32_t *
      entry->payload_size = 0;
      void* data = entry->payload_data;
      entry->payload_data = NULL;
-+    if (diag) {
-+        audio_flush_diag_dequeue(1, *seqnum, *length, entry_count, 0, 0);
-+    }
++    audio_flush_diag_dequeue(1, *seqnum, *length, entry_count, 0, 0);
      return data;
  }
  
@@ -164,7 +154,7 @@ index e936b57..c9fb21f 100644
          raop_rtp_flush(conn->raop_rtp, next_seq);
      } else {
 diff --git a/lib/raop_rtp.c b/lib/raop_rtp.c
-index c5128ef..1325753 100644
+index c5128ef..dc9f17a 100644
 --- a/lib/raop_rtp.c
 +++ b/lib/raop_rtp.c
 @@ -25,6 +25,7 @@
@@ -189,3 +179,19 @@ index c5128ef..1325753 100644
          logger_log(raop_rtp->logger, LOGGER_INFO,
                     "raop_rtp FLUSH: raop_buffer reset to next_seq=%d", flush);
          if (raop_rtp->callbacks.audio_flush) {
+@@ -662,6 +669,7 @@ raop_rtp_start_audio(raop_rtp_t *raop_rtp,  unsigned short *control_rport, unsig
+                      unsigned short *data_lport, unsigned char *ct, unsigned int *sr)
+ {
+     logger_log(raop_rtp->logger, LOGGER_INFO, "raop_rtp starting audio");
++    audio_flush_diag_session_start((int)*ct, *sr, *control_rport, *data_lport);
+     int use_ipv6 = 0;
+ 
+     assert(raop_rtp);
+@@ -831,6 +839,7 @@ raop_rtp_stop(raop_rtp_t *raop_rtp)
+         raop_rtp->dsock = -1;
+     }
+ 
++    audio_flush_diag_session_stop("raop_rtp_stop");
+     /* Flush buffer into initial state */
+     raop_buffer_flush(raop_rtp->buffer, -1);
+ 
