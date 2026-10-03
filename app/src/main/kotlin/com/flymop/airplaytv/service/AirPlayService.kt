@@ -238,7 +238,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         @Suppress("DEPRECATION")
         val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode.toInt()
         else pInfo.versionCode
-        DiagLogShipper.sendBeacon(pInfo.versionName ?: "?", vCode)
+        DiagLogShipper.sendBeacon(pInfo.versionName ?: "?", vCode, from = "service")
         createNotificationChannel()
         dacpController = DacpController(this)
         dacpPlayer = DacpPlayer(
@@ -466,7 +466,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         @Suppress("DEPRECATION")
         val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode.toInt()
         else pInfo.versionCode
-        DiagLogShipper.sendBeacon("${pInfo.versionName ?: "?"}@port$port", vCode)
+        DiagLogShipper.sendBeacon("${pInfo.versionName ?: "?"}@port$port", vCode, from = "service-start")
 
         // register mdns services
         val raopTxt = NativeBridge.nativeGetRaopTxtRecords(nativeHandle) ?: emptyMap()
