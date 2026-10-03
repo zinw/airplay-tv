@@ -150,6 +150,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             val code = outcome.httpStatus ?: 0
             return getString(R.string.diag_ship_ok, code)
         }
+        // Prefer exception class + short scrubbed message so Honor X1 shows the real failure,
+        // not only a coarse kind like 「失败 SSL」.
+        val detail = outcome.errorDetail?.trim().orEmpty()
+        if (detail.isNotEmpty()) {
+            return getString(R.string.diag_ship_fail_detail, detail)
+        }
         return when (outcome.errorKind) {
             "timeout" -> getString(R.string.diag_ship_fail_timeout)
             "dns" -> getString(R.string.diag_ship_fail_dns)
