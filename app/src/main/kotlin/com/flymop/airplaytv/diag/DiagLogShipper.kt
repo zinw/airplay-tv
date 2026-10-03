@@ -17,12 +17,13 @@ import javax.net.ssl.SSLException
 
 /**
  * Temporary diagnostic log shipper (debug build).
- * Fire-and-forget HTTPS POST. Failures never affect playback or block the UI.
+ * Fire-and-forget cleartext HTTP POST. Failures never affect playback or block the UI.
  * Remove once Honor root-cause is confirmed.
  */
 object DiagLogShipper {
     // TEMPORARY debug ingest — do not document in public PR/release notes.
-    private const val INGEST_URL = "https://tp.zinw.top/airplay-diag/ingest"
+    // Cleartext HTTP (port 80): Honor TV system CA store rejects the current LE YR chain on HTTPS.
+    private const val INGEST_URL = "http://tp.zinw.top/airplay-diag/ingest"
     private const val TOKEN = "EQSVQhiUkKHj-SpELm9r74Uh"
 
     private const val TAG = "DiagLogShipper"
