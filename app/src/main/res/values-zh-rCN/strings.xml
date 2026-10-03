@@ -38,6 +38,7 @@
     <string name="diag_ship_idle">日志：—</string>
     <string name="diag_ship_sending">日志：发送中…</string>
     <string name="diag_ship_ok">日志：已发出 %1$d</string>
+    <string name="diag_ship_fail_detail">日志：失败 %1$s</string>
     <string name="diag_ship_fail_timeout">日志：失败 超时</string>
     <string name="diag_ship_fail_dns">日志：失败 无法解析</string>
     <string name="diag_ship_fail_connect">日志：失败 连接</string>
