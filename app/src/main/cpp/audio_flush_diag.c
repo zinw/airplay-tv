@@ -225,7 +225,7 @@ void audio_flush_diag_jni_shutdown(void *jni_env) {
 }
 
 void audio_flush_diag_emit(const char *fmt, ...) {
-    char line[LINE_MAX];
+    char line[DIAG_LINE_MAX];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(line, sizeof(line), fmt, ap);
