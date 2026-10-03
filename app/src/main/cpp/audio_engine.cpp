@@ -101,16 +101,16 @@ struct AudioEngine {
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
     }
 
-    // RAOP FLUSH (next-episode / seek).
+    // RAOP FLUSH (next-episode / seek) — renderer half.
     //
-    // UxPlay's audio_renderer_flush() is intentionally a no-op: the GStreamer pipeline
-    // keeps running and new packets simply continue. Our equivalent: light codec reset +
-    // discard playout backlog, but do NOT stop Oboe, destroy the decoder, or enter a
-    // silent priming gate (those caused the 1–2s next-episode mute on Honor X1).
+    // Packet half lives in UxPlay: patch 0009 calls raop_buffer_flush(next_seq) so the
+    // RTP ring does not stall on a pre-FLUSH hole (~2s hard mute). Here we only do a
+    // light codec reset + discard playout backlog (UxPlay GStreamer flush is a no-op;
+    // do not stop Oboe / destroy decoder / silent-prime).
     void flush() {
         if (mDecoder.decoder) mDecoder.decoder->flush();
         if (mTimeline) mTimeline->requestFlush();
-        mLog->info("audio_flush: uxplay-style playthrough (codec light reset + ring discard)");
+        mLog->info("audio_flush: light codec+ring (raop_buffer reset done in UxPlay FLUSH)");
     }
 
     bool copyDebug(void *dst, size_t dstLen) {
