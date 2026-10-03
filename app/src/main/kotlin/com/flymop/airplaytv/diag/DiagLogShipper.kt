@@ -19,9 +19,12 @@ import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
+import java.net.InetAddress
+import java.net.Socket
 
 /**
  * Temporary diagnostic log shipper (debug build).
@@ -72,9 +75,9 @@ object DiagLogShipper {
         private set
 
     /**
-     * Diag-only TLS: encrypt the session but accept any cert and any hostname.
-     * 1.0.16's host-checked TrustManager still yielded 「失败 SSL」 on Honor X1;
-     * this path skips both CA path and hostname checks for the ingest POST only.
+     * Diag-only TLS: encrypt the session but accept any cert and any hostname,
+     * and force **TLS 1.2 only** (Honor X1 aborted handshake under default TLS
+     * negotiation in 1.0.17 — trust-all did not help).
      * Applied only on this ship's HttpsURLConnection — never set as JVM/app default.
      */
     private val diagTrustAllManager = object : X509TrustManager {
@@ -86,9 +89,52 @@ object DiagLogShipper {
     private val diagAllowAllHostnames = HostnameVerifier { _, _ -> true }
 
     private val diagSslSocketFactory: SSLSocketFactory by lazy {
-        SSLContext.getInstance("TLS").apply {
-            init(null, arrayOf<TrustManager>(diagTrustAllManager), SecureRandom())
-        }.socketFactory
+        // Prefer TLSv1.2 context; still wrap sockets so enabledProtocols cannot drift to 1.3.
+        val ctx = try {
+            SSLContext.getInstance("TLSv1.2")
+        } catch (_: Exception) {
+            SSLContext.getInstance("TLS")
+        }
+        ctx.init(null, arrayOf<TrustManager>(diagTrustAllManager), SecureRandom())
+        Tls12OnlySocketFactory(ctx.socketFactory)
+    }
+
+    /** Delegating factory that pins every SSLSocket to TLSv1.2 only. */
+    private class Tls12OnlySocketFactory(
+        private val delegate: SSLSocketFactory,
+    ) : SSLSocketFactory() {
+        private fun pin(socket: Socket): Socket {
+            if (socket is SSLSocket) {
+                socket.enabledProtocols = arrayOf("TLSv1.2")
+            }
+            return socket
+        }
+
+        override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
+        override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
+
+        override fun createSocket(s: Socket?, host: String?, port: Int, autoClose: Boolean): Socket =
+            pin(delegate.createSocket(s, host, port, autoClose))
+
+        override fun createSocket(host: String?, port: Int): Socket =
+            pin(delegate.createSocket(host, port))
+
+        override fun createSocket(
+            host: String?,
+            port: Int,
+            localHost: InetAddress?,
+            localPort: Int,
+        ): Socket = pin(delegate.createSocket(host, port, localHost, localPort))
+
+        override fun createSocket(host: InetAddress?, port: Int): Socket =
+            pin(delegate.createSocket(host, port))
+
+        override fun createSocket(
+            address: InetAddress?,
+            port: Int,
+            localAddress: InetAddress?,
+            localPort: Int,
+        ): Socket = pin(delegate.createSocket(address, port, localAddress, localPort))
     }
 
     fun addOutcomeListener(listener: OutcomeListener) {
