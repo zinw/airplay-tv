@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext is denied by default. Only the temporary diagnostic ingest host may use HTTP.
+  Native AirPlay sockets are unaffected by Network Security Config; OTA stays HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">REDACTED</domain>
+    </domain-config>
+</network-security-config>

@@ -8,32 +8,22 @@ import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.net.ssl.HostnameVerifier
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
-import javax.net.ssl.SSLSocket
-import javax.net.ssl.SSLSocketFactory
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
-import java.net.InetAddress
-import java.net.Socket
 
 /**
  * Temporary diagnostic log shipper (debug build).
- * Fire-and-forget HTTPS POST. Failures never affect playback or block the UI.
+ * Fire-and-forget cleartext HTTP POST. Failures never affect playback or block the UI.
  * Remove once Honor root-cause is confirmed.
  */
 object DiagLogShipper {
     // TEMPORARY debug ingest — do not document in public PR/release notes.
-    private const val INGEST_URL = "https://REDACTED/airplay-diag/ingest"
+    // Cleartext HTTP on port 80 (Honor X1 aborted every HTTPS handshake path tried in 1.0.16–1.0.18).
+    private const val INGEST_URL = "http://REDACTED/ingest"
     private const val TOKEN = "REDACTED"
 
     private const val TAG = "DiagLogShipper"
@@ -73,69 +63,6 @@ object DiagLogShipper {
     private val listeners = CopyOnWriteArrayList<OutcomeListener>()
     @Volatile var lastOutcome: Outcome? = null
         private set
-
-    /**
-     * Diag-only TLS: encrypt the session but accept any cert and any hostname,
-     * and force **TLS 1.2 only** (Honor X1 aborted handshake under default TLS
-     * negotiation in 1.0.17 — trust-all did not help).
-     * Applied only on this ship's HttpsURLConnection — never set as JVM/app default.
-     */
-    private val diagTrustAllManager = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) = Unit
-        override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) = Unit
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-    }
-
-    private val diagAllowAllHostnames = HostnameVerifier { _, _ -> true }
-
-    private val diagSslSocketFactory: SSLSocketFactory by lazy {
-        // Prefer TLSv1.2 context; still wrap sockets so enabledProtocols cannot drift to 1.3.
-        val ctx = try {
-            SSLContext.getInstance("TLSv1.2")
-        } catch (_: Exception) {
-            SSLContext.getInstance("TLS")
-        }
-        ctx.init(null, arrayOf<TrustManager>(diagTrustAllManager), SecureRandom())
-        Tls12OnlySocketFactory(ctx.socketFactory)
-    }
-
-    /** Delegating factory that pins every SSLSocket to TLSv1.2 only. */
-    private class Tls12OnlySocketFactory(
-        private val delegate: SSLSocketFactory,
-    ) : SSLSocketFactory() {
-        private fun pin(socket: Socket): Socket {
-            if (socket is SSLSocket) {
-                socket.enabledProtocols = arrayOf("TLSv1.2")
-            }
-            return socket
-        }
-
-        override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
-        override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
-
-        override fun createSocket(s: Socket?, host: String?, port: Int, autoClose: Boolean): Socket =
-            pin(delegate.createSocket(s, host, port, autoClose))
-
-        override fun createSocket(host: String?, port: Int): Socket =
-            pin(delegate.createSocket(host, port))
-
-        override fun createSocket(
-            host: String?,
-            port: Int,
-            localHost: InetAddress?,
-            localPort: Int,
-        ): Socket = pin(delegate.createSocket(host, port, localHost, localPort))
-
-        override fun createSocket(host: InetAddress?, port: Int): Socket =
-            pin(delegate.createSocket(host, port))
-
-        override fun createSocket(
-            address: InetAddress?,
-            port: Int,
-            localAddress: InetAddress?,
-            localPort: Int,
-        ): Socket = pin(delegate.createSocket(address, port, localAddress, localPort))
-    }
 
     fun addOutcomeListener(listener: OutcomeListener) {
         listeners.addIfAbsent(listener)
@@ -220,45 +147,27 @@ object DiagLogShipper {
     private fun postQuietly(body: String) {
         var conn: HttpURLConnection? = null
         try {
-            val url = URL(INGEST_URL)
-            val opened = url.openConnection()
-            if (opened !is HttpsURLConnection) {
-                // Unexpected: ingest must be HTTPS. Report clearly — do not fall through to cleartext.
-                publishOutcome(
-                    Outcome(
-                        ok = false,
-                        httpStatus = null,
-                        errorKind = "other",
-                        errorDetail = scrubDetail("NotHttps ${opened.javaClass.simpleName}"),
-                    ),
-                )
-                return
+            conn = (URL(INGEST_URL).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = CONNECT_MS
+                readTimeout = READ_MS
+                setRequestProperty("Content-Type", "text/plain; charset=utf-8")
+                setRequestProperty("X-Log-Token", TOKEN)
+                setFixedLengthStreamingMode(body.toByteArray(Charsets.UTF_8).size)
             }
-            // Install trust-all factory + allow-all hostname BEFORE any connect/write.
-            opened.sslSocketFactory = diagSslSocketFactory
-            opened.hostnameVerifier = diagAllowAllHostnames
-            opened.requestMethod = "POST"
-            opened.doOutput = true
-            opened.connectTimeout = CONNECT_MS
-            opened.readTimeout = READ_MS
-            opened.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
-            opened.setRequestProperty("X-Log-Token", TOKEN)
-            val payload = body.toByteArray(Charsets.UTF_8)
-            opened.setFixedLengthStreamingMode(payload.size)
-            conn = opened
-
-            opened.outputStream.use { it.write(payload) }
+            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val code = try {
-                opened.responseCode
+                conn.responseCode
             } catch (t: Throwable) {
                 publishOutcome(failureOutcome(t))
                 return
             }
             try {
-                opened.inputStream?.use { it.readBytes() }
+                conn.inputStream?.use { it.readBytes() }
             } catch (_: Exception) {
                 try {
-                    opened.errorStream?.use { it.readBytes() }
+                    conn.errorStream?.use { it.readBytes() }
                 } catch (_: Exception) {
                 }
             }
@@ -308,6 +217,7 @@ object DiagLogShipper {
             val msg = cur.message?.lowercase().orEmpty()
             if (msg.contains("timeout") || msg.contains("timed out")) return "timeout"
             if (msg.contains("unable to resolve") || msg.contains("unknown host")) return "dns"
+            if (msg.contains("cleartext") || msg.contains("clear text")) return "connect"
             if (msg.contains("ssl") || msg.contains("handshake") || msg.contains("trust") ||
                 msg.contains("certpath") || msg.contains("certificate")
             ) {
@@ -361,6 +271,7 @@ object DiagLogShipper {
         return when {
             "timeout" in blob || "timed out" in blob -> "超时"
             "unknownhost" in blob || "unable to resolve" in blob -> "无法解析"
+            "cleartext" in blob || "clear text" in blob -> "明文被拒"
             "connectexception" in blob || "failed to connect" in blob -> "连接"
             "handshake" in blob -> "握手"
             "trust" in blob || "certpath" in blob || "certificate" in blob ||
@@ -375,8 +286,10 @@ object DiagLogShipper {
     private fun scrubDetail(raw: String): String {
         var s = raw
             .replace(Regex("https?://\\S+", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("(?i)airplay\\.zinw\\.top"), "")
             .replace(Regex("(?i)tp\\.zinw\\.top"), "")
             .replace(Regex("(?i)airplay-diag\\S*"), "")
+            .replace(Regex("(?i)/ingest\\S*"), "")
             .replace(Regex("(?i)x-log-token\\S*"), "")
             .replace(Regex("\\s+"), " ")
             .trim()
