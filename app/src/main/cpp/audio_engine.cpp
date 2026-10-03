@@ -15,7 +15,6 @@
 #include "audio_engine.h"
 #include "audio_decoder.h"
 #include "audio_output.h"
-#include "audio_flush_diag.h"
 #include "log_sink.h"
 #include "timeline_buffer.h"
 
@@ -100,7 +99,6 @@ struct AudioEngine {
         const int i = ctIndex(ct);
         if (i < 0 || spf <= 0) return;
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
-        audio_flush_diag_format(ct, spf, mSampleRate, /*using_screen=*/-1);
     }
 
     // RAOP FLUSH (next-episode / seek) — renderer half.
@@ -113,7 +111,6 @@ struct AudioEngine {
         if (mDecoder.decoder) mDecoder.decoder->flush();
         if (mTimeline) mTimeline->requestFlush();
         mLog->info("audio_flush: light codec+ring (raop_buffer reset done in UxPlay FLUSH)");
-        audio_flush_diag_renderer_flush();
     }
 
     bool copyDebug(void *dst, size_t dstLen) {
@@ -158,7 +155,6 @@ struct AudioEngine {
                                     mDecLatency, *mLog, mApplied->forceSwAlac,
                                     /*realtimePriority=*/false, /*lowLatency=*/false)};
             mRetryAtNs = mDecoder.decoder ? 0 : monoNs() + DECODER_RETRY_NS;
-            audio_flush_diag_codec_reset(ct, wantConfig.spf, mDecoder.decoder ? 1 : 0);
             // codec switch is definitely a discontinuity
             mTimeline->reanchorTracker();
         }
@@ -256,13 +252,11 @@ void audio_engine_flush(AudioEngine *engine) {
 
 bool audio_engine_start(AudioEngine *engine) {
     if (!engine) return false;
-    audio_flush_diag_emit("AUDIO_ENGINE_START");
     return engine->start();
 }
 
 void audio_engine_pause(AudioEngine *engine) {
     if (!engine) return;
-    audio_flush_diag_emit("AUDIO_ENGINE_PAUSE");
     engine->pause();
 }
 

@@ -107,16 +107,6 @@
 
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvDiagShipStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:focusable="false"
-                android:text="@string/diag_ship_idle"
-                android:textColor="@color/tv_text_secondary"
-                android:textSize="13sp"
-                tools:text="日志：已发出 204" />
 
             <!--
               D-pad action row: must stay above the fold on overscanned TVs.

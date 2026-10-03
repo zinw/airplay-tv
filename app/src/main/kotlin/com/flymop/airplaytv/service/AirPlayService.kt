@@ -50,7 +50,6 @@ import com.flymop.airplaytv.audio.DmapParser
 import com.flymop.airplaytv.audio.TrackInfo
 import com.flymop.airplaytv.audio.VolumeBroadcast
 import com.flymop.airplaytv.bridge.LogListener
-import com.flymop.airplaytv.diag.DiagLogShipper
 import com.flymop.airplaytv.bridge.NativeBridge
 import com.flymop.airplaytv.bridge.RaopCallbackHandler
 import com.flymop.airplaytv.discovery.NsdServiceManager
@@ -232,13 +231,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onCreate() {
         super.onCreate()
-        // TEMPORARY Honor next-ep audio diag: remote ship + startup beacon.
-        DiagLogShipper.start()
-        val pInfo = packageManager.getPackageInfo(packageName, 0)
-        @Suppress("DEPRECATION")
-        val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode.toInt()
-        else pInfo.versionCode
-        DiagLogShipper.sendBeacon(pInfo.versionName ?: "?", vCode, from = "service")
         createNotificationChannel()
         dacpController = DacpController(this)
         dacpPlayer = DacpPlayer(
@@ -461,13 +453,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             return
         }
         _serverPort.value = port
-        // Second beacon after native httpd is up (reachability check independent of FLUSH).
-        val pInfo = packageManager.getPackageInfo(packageName, 0)
-        @Suppress("DEPRECATION")
-        val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) pInfo.longVersionCode.toInt()
-        else pInfo.versionCode
-        DiagLogShipper.sendBeacon("${pInfo.versionName ?: "?"}@port$port", vCode, from = "service-start")
-
         // register mdns services
         val raopTxt = NativeBridge.nativeGetRaopTxtRecords(nativeHandle) ?: emptyMap()
         val airplayTxt = NativeBridge.nativeGetAirplayTxtRecords(nativeHandle) ?: emptyMap()
@@ -686,7 +671,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         dacpController = null
         mediaSession?.release()
         mediaSession = null
-        DiagLogShipper.stop()
         super.onDestroy()
     }
 

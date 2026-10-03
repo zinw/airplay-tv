@@ -10,7 +10,6 @@
 #include <string>
 
 #include "audio_time.h"
-#include "audio_flush_diag.h"
 
 /*
  * lock-free SPSC ring of int16 samples (interleaved frames); positions are
@@ -254,7 +253,6 @@ public:
         // pts 0 = sender clock not NTP synced yet
         if (ptsNs == 0) {
             mRing.write(pcm, samples);
-            audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
             return;
         }
         const int64_t durNs = samples * NS_PER_SEC / mChannels / mSampleRate;
@@ -271,7 +269,6 @@ public:
             mTracker.observe(ptsNs, monoNs(), durNs);
             mRing.write(pcm, samples);
             mExpectedPtsNs = ptsNs + durNs;
-            audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
             return;
         }
 
@@ -288,7 +285,6 @@ public:
                 mTracker.observe(ptsNs, monoNs(), durNs);
                 mRing.write(pcm, samples);
                 mExpectedPtsNs = ptsNs + durNs;
-                audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
                 return;
             }
             requestFlush();
@@ -313,7 +309,6 @@ public:
         }
         mRing.write(pcm, samples);
         mExpectedPtsNs = ptsNs + durNs;
-        audio_flush_diag_pcm_written((unsigned)samples, ptsNs);
     }
 
     // consumer: pop frames*channels samples into out, silence-padded on underrun
@@ -412,7 +407,6 @@ public:
             mLastTrimBlockNs = now;  // hold off trims while rebuilding
             mUnderran.store(true, std::memory_order_relaxed);  // producer re-anchors
             mMetrics.countUnderrun();
-            audio_flush_diag_underrun((int)need / mChannels, (int)(got / mChannels));
         }
     }
 

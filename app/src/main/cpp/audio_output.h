@@ -8,7 +8,6 @@
 
 #include "log_sink.h"
 #include "timeline_buffer.h"
-#include "audio_flush_diag.h"
 
 class AudioOutput;
 
@@ -30,7 +29,6 @@ public:
                                           int32_t numFrames) override {
         auto *pcm = static_cast<int16_t *>(audioData);
         mTimeline->read(pcm, numFrames);
-        audio_flush_diag_oboe_pcm(pcm, numFrames * mTimeline->channels(), numFrames);
         return oboe::DataCallbackResult::Continue;
     }
 
