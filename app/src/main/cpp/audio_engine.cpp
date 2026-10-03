@@ -15,10 +15,9 @@
 #include "audio_engine.h"
 #include "audio_decoder.h"
 #include "audio_output.h"
+#include "audio_flush_diag.h"
 #include "log_sink.h"
 #include "timeline_buffer.h"
-
-#include <android/log.h>
 
 /*
  * debug metrics copied out to Java each overlay poll (see copyDebug). MUST BE PACKED,
@@ -113,9 +112,7 @@ struct AudioEngine {
         if (mDecoder.decoder) mDecoder.decoder->flush();
         if (mTimeline) mTimeline->requestFlush();
         mLog->info("audio_flush: light codec+ring (raop_buffer reset done in UxPlay FLUSH)");
-        // AirPlayAudio: renderer half of FLUSH (packet half already logged in UxPlay)
-        __android_log_print(ANDROID_LOG_INFO, "AirPlayAudio",
-                            "renderer_flush light codec+ring requestFlush");
+        audio_flush_diag_renderer_flush();
     }
 
     bool copyDebug(void *dst, size_t dstLen) {

@@ -1,6 +1,7 @@
 /**
  * Next-episode / RTSP FLUSH diagnostics for Honor QA (logcat tag AirPlayAudio).
  * Active for ~3s after each FLUSH; otherwise no-ops stay cheap.
+ * Also batches lines for temporary remote ingest (see DiagLogShipper).
  */
 #ifndef AUDIO_FLUSH_DIAG_H
 #define AUDIO_FLUSH_DIAG_H
@@ -13,6 +14,16 @@ extern "C" {
 
 /** Tag for adb logcat -s AirPlayAudio:I */
 #define AIRPLAY_AUDIO_TAG "AirPlayAudio"
+
+/** Cache DiagLogShipper JNI handles; call once from nativeInit (pass JNIEnv*). */
+void audio_flush_diag_jni_init(void *jni_env);
+
+/** Drop JNI globals / stop shipper thread; call from nativeDestroy (pass JNIEnv*). */
+void audio_flush_diag_jni_shutdown(void *jni_env);
+
+/** Format + logcat + enqueue for remote ship (FLUSH-window lines only). */
+void audio_flush_diag_emit(const char *fmt, ...)
+    __attribute__((format(printf, 1, 2)));
 
 /** RTSP FLUSH request (RTP-Info header as received). */
 void audio_flush_diag_rtsp_flush(const char *rtpinfo, int next_seq);
@@ -47,6 +58,8 @@ void audio_flush_diag_pcm_written(unsigned samples, int64_t pts_ns);
 
 /** First Oboe callback that delivers non-silent PCM after FLUSH. */
 void audio_flush_diag_audible(const char *where, int non_zero_samples, int frames);
+
+void audio_flush_diag_renderer_flush(void);
 
 #ifdef __cplusplus
 }
