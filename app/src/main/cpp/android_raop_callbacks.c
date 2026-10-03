@@ -17,6 +17,7 @@
 #include <android/log.h>
 #include "android_raop_callbacks.h"
 #include "audio_engine.h"
+#include "audio_flush_diag.h"
 
 #define TAG "AirPlayNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -202,6 +203,7 @@ static void _audio_set_volume(void *cls, float volume) {
 static void _audio_get_format(void *cls, unsigned char *ct, unsigned short *spf,
                                bool *usingScreen, bool *isMedia, uint64_t *audioFormat) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    audio_flush_diag_format((int)*ct, (int)*spf, 44100, usingScreen ? (int)*usingScreen : -1);
     JNIEnv *env = _get_env(ctx);
     if (!env) return;
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_audio_format,
@@ -263,6 +265,7 @@ static void _audio_flush(void *cls) {
 static void _audio_stop_coverart_rendering(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     LOGI("audio_teardown");
+    audio_flush_diag_session_stop("audio_teardown");
     JNIEnv *env = _get_env(ctx);
     if (!env) return;
     (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_audio_teardown);
