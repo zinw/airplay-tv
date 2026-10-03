@@ -12,8 +12,8 @@ android {
         applicationId = "com.flymop.airplaytv"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.0.13"
+        versionCode = 15
+        versionName = "1.0.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

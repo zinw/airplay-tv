@@ -1,7 +1,6 @@
 /**
- * Next-episode / RTSP FLUSH diagnostics for Honor QA (logcat tag AirPlayAudio).
- * Active for ~3s after each FLUSH; otherwise no-ops stay cheap.
- * Also batches lines for temporary remote ingest (see DiagLogShipper).
+ * Temporary Honor QA audio diagnostics (logcat tag AirPlayAudio) + remote ship.
+ * Not limited to RTSP FLUSH: system Screen Mirroring next-episode may never FLUSH.
  */
 #ifndef AUDIO_FLUSH_DIAG_H
 #define AUDIO_FLUSH_DIAG_H
@@ -12,23 +11,22 @@
 extern "C" {
 #endif
 
-/** Tag for adb logcat -s AirPlayAudio:I */
 #define AIRPLAY_AUDIO_TAG "AirPlayAudio"
 
-/** Cache DiagLogShipper JNI handles; call once from nativeInit (pass JNIEnv*). */
 void audio_flush_diag_jni_init(void *jni_env);
-
-/** Drop JNI globals / stop shipper thread; call from nativeDestroy (pass JNIEnv*). */
 void audio_flush_diag_jni_shutdown(void *jni_env);
 
-/** Format + logcat + enqueue for remote ship (FLUSH-window lines only). */
+/** Always ships (logcat + remote). */
 void audio_flush_diag_emit(const char *fmt, ...)
     __attribute__((format(printf, 1, 2)));
 
-/** RTSP FLUSH request (RTP-Info header as received). */
-void audio_flush_diag_rtsp_flush(const char *rtpinfo, int next_seq);
+/** Startup / session lifecycle. */
+void audio_flush_diag_beacon(const char *version_name, int version_code);
+void audio_flush_diag_session_start(int ct, unsigned sample_rate, unsigned short control_port,
+                                    unsigned short data_port);
+void audio_flush_diag_session_stop(const char *why);
 
-/** Mark FLUSH boundary; starts the post-FLUSH capture window. */
+void audio_flush_diag_rtsp_flush(const char *rtpinfo, int next_seq);
 void audio_flush_diag_on_flush(int next_seq,
                                int buffer_flushed,
                                int was_empty,
@@ -39,12 +37,12 @@ void audio_flush_diag_on_flush(int next_seq,
                                int is_empty_after,
                                unsigned first_seq_after);
 
-/** True while within the post-FLUSH window. */
+/** True while an interest window is open (FLUSH / seq-jump / hole / underrun). */
 int audio_flush_diag_active(void);
-
-/** Milliseconds since last FLUSH mark (or -1 if no active window). */
 int audio_flush_diag_ms_since_flush(void);
+int audio_flush_diag_flush_seen(void);
 
+/** Always called from raop_buffer (not gated). Summarizes holes; logs seq jumps. */
 void audio_flush_diag_dequeue(int got_payload,
                               unsigned seq,
                               unsigned payload_bytes,
@@ -54,11 +52,12 @@ void audio_flush_diag_dequeue(int got_payload,
 
 void audio_flush_diag_enqueue_auto_flush(unsigned incoming_seq, unsigned first_seq_before);
 
+void audio_flush_diag_format(int ct, int spf, int sample_rate, int using_screen);
+void audio_flush_diag_codec_reset(int ct, int spf, int ok);
+
 void audio_flush_diag_pcm_written(unsigned samples, int64_t pts_ns);
-
-/** First Oboe callback that delivers non-silent PCM after FLUSH. */
-void audio_flush_diag_audible(const char *where, int non_zero_samples, int frames);
-
+void audio_flush_diag_underrun(int frames_needed, int frames_got);
+void audio_flush_diag_oboe_pcm(const int16_t *pcm, int samples, int frames);
 void audio_flush_diag_renderer_flush(void);
 
 #ifdef __cplusplus

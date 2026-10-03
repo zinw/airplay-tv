@@ -30,19 +30,7 @@ public:
                                           int32_t numFrames) override {
         auto *pcm = static_cast<int16_t *>(audioData);
         mTimeline->read(pcm, numFrames);
-        if (audio_flush_diag_active()) {
-            const int samples = numFrames * mTimeline->channels();
-            int nz = 0;
-            for (int i = 0; i < samples; ++i) {
-                if (pcm[i] != 0) {
-                    ++nz;
-                    if (nz >= 4) break;  // enough to call it audible
-                }
-            }
-            if (nz > 0) {
-                audio_flush_diag_audible("oboe_callback", nz, numFrames);
-            }
-        }
+        audio_flush_diag_oboe_pcm(pcm, numFrames * mTimeline->channels(), numFrames);
         return oboe::DataCallbackResult::Continue;
     }
 
