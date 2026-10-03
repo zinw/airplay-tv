@@ -15,7 +15,7 @@
 #define NULL_SUMMARY_NS (250000000LL)
 #define BATCH_CAP (48 * 1024)
 #define BATCH_FLUSH_NS (300000000LL) /* ~300ms */
-#define LINE_MAX 512
+#define DIAG_LINE_MAX 512
 
 static atomic_llong g_flush_ns;
 static atomic_int g_next_seq;
