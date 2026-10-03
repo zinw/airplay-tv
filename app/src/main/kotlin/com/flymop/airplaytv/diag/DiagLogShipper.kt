@@ -1,17 +1,24 @@
 package com.flymop.airplaytv.diag
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.net.ssl.SSLException
 
 /**
- * Temporary next-episode audio diagnostic shipper (debug build).
- * Fire-and-forget HTTPS POST of AirPlayAudio lines only. Failures never affect playback.
- * Remove this class (and native wiring) once Honor root-cause is confirmed.
+ * Temporary diagnostic log shipper (debug build).
+ * Fire-and-forget HTTPS POST. Failures never affect playback or block the UI.
+ * Remove once Honor root-cause is confirmed.
  */
 object DiagLogShipper {
     // TEMPORARY debug ingest — do not document in public PR/release notes.
@@ -20,16 +27,45 @@ object DiagLogShipper {
 
     private const val TAG = "DiagLogShipper"
     private const val MAX_BODY = 60 * 1024
-    private const val CONNECT_MS = 1500
-    private const val READ_MS = 2000
+    private const val CONNECT_MS = 5000
+    private const val READ_MS = 5000
+
+    /** Result of one POST — no URL/token; safe to show on TV UI. */
+    data class Outcome(
+        val ok: Boolean,
+        /** HTTP status when a response was received; null on transport failure. */
+        val httpStatus: Int?,
+        /**
+         * Short machine reason for failures: timeout / dns / connect / ssl / http / other.
+         * Null when ok.
+         */
+        val errorKind: String?,
+    )
+
+    fun interface OutcomeListener {
+        fun onShipOutcome(outcome: Outcome)
+    }
 
     private val started = AtomicBoolean(false)
     private val queue = LinkedBlockingQueue<String>(512)
     private val exec = Executors.newSingleThreadExecutor { r ->
         Thread(r, "airplay-diag-ship").apply { isDaemon = true }
     }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val listeners = CopyOnWriteArrayList<OutcomeListener>()
+    @Volatile var lastOutcome: Outcome? = null
+        private set
 
-    /** Idempotent; safe to call from service onCreate. */
+    fun addOutcomeListener(listener: OutcomeListener) {
+        listeners.addIfAbsent(listener)
+        lastOutcome?.let { listener.onShipOutcome(it) }
+    }
+
+    fun removeOutcomeListener(listener: OutcomeListener) {
+        listeners.remove(listener)
+    }
+
+    /** Idempotent background ship loop. */
     fun start() {
         if (!started.compareAndSet(false, true)) return
         exec.execute {
@@ -55,7 +91,7 @@ object DiagLogShipper {
                 } catch (_: InterruptedException) {
                     break
                 } catch (t: Throwable) {
-                    Log.w(TAG, "ship loop: ${t.message}")
+                    Log.w(TAG, "ship loop: ${t.javaClass.simpleName}")
                     batch.setLength(0)
                 }
             }
@@ -63,20 +99,19 @@ object DiagLogShipper {
     }
 
     /**
-     * Immediate hello so we can tell "TV cannot reach ingest" vs "diag never armed".
-     * Fire-and-forget; never throws to callers.
+     * Immediate hello. Fire-and-forget; outcome is reported via [OutcomeListener].
+     * @param from short label e.g. activity / service / native (no secrets).
      */
-    fun sendBeacon(versionName: String, versionCode: Int) {
+    fun sendBeacon(versionName: String, versionCode: Int, from: String = "kotlin") {
         start()
         val line =
-            "BEACON hello AirPlayTV version=$versionName versionCode=$versionCode from=kotlin"
-        enqueueBatch(line)
-        // Direct one-shot so the first POST is not delayed by batch coalesce.
+            "BEACON hello AirPlayTV version=$versionName versionCode=$versionCode from=$from"
+        // Direct one-shot so UI gets a timely outcome (not delayed by batch coalesce).
         exec.execute {
             try {
                 postQuietly(line)
             } catch (t: Throwable) {
-                Log.w(TAG, "beacon failed: ${t.message}")
+                publishOutcome(Outcome(false, null, classifyError(t)))
             }
         }
     }
@@ -86,14 +121,11 @@ object DiagLogShipper {
         queue.clear()
     }
 
-    /**
-     * Called from native (any thread) via JNI. Must return quickly — only enqueue.
-     */
+    /** Native/any-thread enqueue. Must return quickly. */
     @JvmStatic
     fun enqueueBatch(text: String?) {
         if (text.isNullOrEmpty()) return
         start()
-        // Drop on overflow rather than block audio/RTP threads.
         if (!queue.offer(text)) {
             Log.w(TAG, "diag ship queue full; dropping batch")
         }
@@ -117,7 +149,12 @@ object DiagLogShipper {
                 setFixedLengthStreamingMode(body.toByteArray(Charsets.UTF_8).size)
             }
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            // Drain response; ignore status — never surface to UI/playback.
+            val code = try {
+                conn.responseCode
+            } catch (t: Throwable) {
+                publishOutcome(Outcome(false, null, classifyError(t)))
+                return
+            }
             try {
                 conn.inputStream?.use { it.readBytes() }
             } catch (_: Exception) {
@@ -126,12 +163,55 @@ object DiagLogShipper {
                 } catch (_: Exception) {
                 }
             }
+            val ok = code in 200..299
+            publishOutcome(
+                Outcome(
+                    ok = ok,
+                    httpStatus = code,
+                    errorKind = if (ok) null else "http",
+                ),
+            )
+            if (!ok) {
+                Log.w(TAG, "ingest HTTP $code")
+            }
         } catch (t: Throwable) {
-            Log.w(TAG, "ingest failed: ${t.message}")
+            val kind = classifyError(t)
+            Log.w(TAG, "ingest failed: $kind")
+            publishOutcome(Outcome(false, null, kind))
         } finally {
             try {
                 conn?.disconnect()
             } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun classifyError(t: Throwable): String {
+        var cur: Throwable? = t
+        while (cur != null) {
+            when (cur) {
+                is SocketTimeoutException -> return "timeout"
+                is UnknownHostException -> return "dns"
+                is ConnectException -> return "connect"
+                is SSLException -> return "ssl"
+            }
+            val msg = cur.message?.lowercase().orEmpty()
+            if (msg.contains("timeout") || msg.contains("timed out")) return "timeout"
+            if (msg.contains("unable to resolve") || msg.contains("unknown host")) return "dns"
+            cur = cur.cause
+        }
+        return "other"
+    }
+
+    private fun publishOutcome(outcome: Outcome) {
+        lastOutcome = outcome
+        mainHandler.post {
+            for (l in listeners) {
+                try {
+                    l.onShipOutcome(outcome)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "outcome listener: ${t.javaClass.simpleName}")
+                }
             }
         }
     }
