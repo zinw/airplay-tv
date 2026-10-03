@@ -34,7 +34,6 @@ import androidx.lifecycle.lifecycleScope
 import com.flymop.airplaytv.R
 import com.flymop.airplaytv.databinding.ActivityMainBinding
 import com.flymop.airplaytv.Prefs
-import com.flymop.airplaytv.diag.DiagLogShipper
 import com.flymop.airplaytv.net.WifiLinkMetrics
 import com.flymop.airplaytv.service.AirPlayService
 import com.flymop.airplaytv.service.AirPlayService.ServerState
@@ -60,10 +59,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var downloadProgressDialog: AlertDialog? = null
     private var lastAvailableUpdate: AppUpdateChecker.AvailableUpdate? = null
 
-    private val diagShipListener = DiagLogShipper.OutcomeListener { outcome ->
-        if (!::binding.isInitialized || isFinishing || isDestroyed) return@OutcomeListener
-        binding.tvDiagShipStatus.text = formatDiagShipOutcome(outcome)
-    }
 
     private val installPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -129,41 +124,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         bindVersionLabels()
         startAndBindService()
         maybeCheckForUpdate()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        DiagLogShipper.addOutcomeListener(diagShipListener)
-        binding.tvDiagShipStatus.setText(R.string.diag_ship_sending)
-        val (name, code) = currentVersion()
-        // Always beacon on activity start — re-opening while service is RUNNING skips Service.onCreate.
-        DiagLogShipper.sendBeacon(name, code.toInt(), from = "activity")
-    }
-
-    override fun onStop() {
-        DiagLogShipper.removeOutcomeListener(diagShipListener)
-        super.onStop()
-    }
-
-    private fun formatDiagShipOutcome(outcome: DiagLogShipper.Outcome): String {
-        if (outcome.ok) {
-            val code = outcome.httpStatus ?: 0
-            return getString(R.string.diag_ship_ok, code)
-        }
-        // Prefer exception class + short scrubbed message so Honor X1 shows the real failure,
-        // not only a coarse kind like 「失败 SSL」.
-        val detail = outcome.errorDetail?.trim().orEmpty()
-        if (detail.isNotEmpty()) {
-            return getString(R.string.diag_ship_fail_detail, detail)
-        }
-        return when (outcome.errorKind) {
-            "timeout" -> getString(R.string.diag_ship_fail_timeout)
-            "dns" -> getString(R.string.diag_ship_fail_dns)
-            "connect" -> getString(R.string.diag_ship_fail_connect)
-            "ssl" -> getString(R.string.diag_ship_fail_ssl)
-            "http" -> getString(R.string.diag_ship_fail_http, outcome.httpStatus ?: 0)
-            else -> getString(R.string.diag_ship_fail_other)
-        }
     }
 
     /** Soft fail: offline / rate-limit / parse errors never block the home screen. */

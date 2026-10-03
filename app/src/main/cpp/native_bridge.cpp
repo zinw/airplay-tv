@@ -27,7 +27,6 @@ extern "C" {
 
 #include "audio_engine.h"
 #include "log_sink.h"
-#include "audio_flush_diag.h"
 
 #define TAG "AirPlayNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -124,9 +123,6 @@ Java_com_flymop_airplaytv_bridge_NativeBridge_nativeInit(
     ctx->log = std::make_shared<LogSink>();
     ctx->log->bind(env, callback);
 
-    /* TEMPORARY: next-ep FLUSH diag remote ship (Honor QA). */
-    audio_flush_diag_jni_init(env);
-
     ctx->cb_ctx.audio_engine = audio_engine_create(ctx->log, 44100, 2);
 
     return (jlong)(intptr_t)ctx;
@@ -157,8 +153,6 @@ Java_com_flymop_airplaytv_bridge_NativeBridge_nativeStart(
 
     LOGI("AirPlay server started on port %d", port);
 
-    /* TEMPORARY: native-side reachability beacon (does not depend on FLUSH). */
-    audio_flush_diag_beacon("1.0.20-native", 21);
 
     /* Register dnssd records (stored in shim, Kotlin reads them) */
     if (ctx->dnssd) {
@@ -218,7 +212,6 @@ Java_com_flymop_airplaytv_bridge_NativeBridge_nativeDestroy(
         dnssd_destroy(ctx->dnssd);
         ctx->dnssd = NULL;
     }
-    audio_flush_diag_jni_shutdown(env);
     android_callbacks_destroy(&ctx->cb_ctx, env);
     delete ctx;
 }
