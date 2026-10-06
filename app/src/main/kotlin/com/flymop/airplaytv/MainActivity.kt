@@ -14,7 +14,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -386,14 +385,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             restartServerWithFeedback()
         }
 
-        // Row: Advertise audio (mirror-audio style toggle from iMirror/PhairPlay)
-        binding.rowSettingAdvertiseAudio.setOnClickListener {
-            val newState = !binding.switchAdvertiseAudio.isChecked
-            binding.switchAdvertiseAudio.isChecked = newState
-            prefs.edit().putBoolean(Prefs.ADVERTISE_AUDIO, newState).apply()
-            restartServerWithFeedback()
-        }
-
         // Row: Audio stability (adaptive cushion step — hot-applied via audioConfigFlow)
         binding.rowSettingAudioStability.setOnClickListener {
             val current = prefs.getInt(Prefs.AUDIO_ADAPTIVE_STEP, Prefs.DEF_AUDIO_ADAPTIVE_STEP)
@@ -422,7 +413,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.switchPin.isChecked = Prefs.isRequirePin(prefs)
         binding.switchOverscan.isChecked = prefs.getBoolean(Prefs.OVERSCANNED, Prefs.DEF_OVERSCANNED)
         binding.switchAllowNewConn.isChecked = prefs.getBoolean(Prefs.ALLOW_NEW_CONN, Prefs.DEF_ALLOW_NEW_CONN)
-        binding.switchAdvertiseAudio.isChecked = prefs.getBoolean(Prefs.ADVERTISE_AUDIO, Prefs.DEF_ADVERTISE_AUDIO)
         binding.switchBootAutoStart.isChecked = prefs.getBoolean(Prefs.BOOT_AUTO_START, Prefs.DEF_BOOT_AUTO_START)
         binding.tvSettingResolutionVal.text = resolutionLabel(
             prefs.getString(Prefs.RESOLUTION, Prefs.DEF_RESOLUTION) ?: Prefs.DEF_RESOLUTION
@@ -657,29 +647,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
 
         lifecycleScope.launch {
-            service.trackInfo.collectLatest { track ->
+            service.trackInfo.collectLatest {
                 runOnUiThread {
                     updateViewVisibility()
-                    if (track.title.isNotBlank()) {
-                        binding.tvTrackTitle.text = track.title
-                        binding.tvTrackArtist.text = listOfNotNull(track.artist.takeIf { it.isNotBlank() }, track.album.takeIf { it.isNotBlank() }).joinToString(" - ")
-                    } else {
-                        binding.tvTrackTitle.text = getString(R.string.airplay_audio_title)
-                        binding.tvTrackArtist.text = getString(R.string.airplay_audio_subtitle)
-                    }
-                }
-            }
-        }
-
-        lifecycleScope.launch {
-            service.coverArt.collectLatest { bytes ->
-                runOnUiThread {
-                    if (bytes != null && bytes.isNotEmpty()) {
-                        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        binding.ivCoverArt.setImageBitmap(bmp)
-                    } else {
-                        binding.ivCoverArt.setImageResource(R.drawable.bg_card)
-                    }
                 }
             }
         }
@@ -689,44 +659,25 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val service = airPlayService ?: return
         val isMirroring = service.mirrorRunning.value
         val hasHlsVideo = service.videoLocation.value != null
-        val hasMusic = (service.audioOnly.value || service.trackInfo.value.title.isNotBlank()) && !isMirroring && !hasHlsVideo
 
         when {
             hasHlsVideo -> {
                 binding.ambientContainer.visibility = View.GONE
                 binding.videoContainer.visibility = View.GONE
                 binding.surfaceView.visibility = View.GONE
-                binding.musicContainer.visibility = View.GONE
                 binding.hlsPlayerView.visibility = View.VISIBLE
-                binding.visualizerView.setPlaying(false)
             }
             isMirroring -> {
                 binding.ambientContainer.visibility = View.GONE
                 binding.hlsPlayerView.visibility = View.GONE
-                binding.musicContainer.visibility = View.GONE
                 binding.videoContainer.visibility = View.VISIBLE
                 binding.surfaceView.visibility = View.VISIBLE
-                binding.visualizerView.setPlaying(false)
-            }
-            hasMusic -> {
-                binding.ambientContainer.visibility = View.GONE
-                binding.hlsPlayerView.visibility = View.GONE
-                binding.videoContainer.visibility = View.GONE
-                binding.surfaceView.visibility = View.GONE
-                binding.musicContainer.visibility = View.VISIBLE
-                binding.visualizerView.setPlaying(true)
-                if (service.trackInfo.value.title.isBlank()) {
-                    binding.tvTrackTitle.text = getString(R.string.airplay_audio_title)
-                    binding.tvTrackArtist.text = getString(R.string.airplay_audio_subtitle)
-                }
             }
             else -> {
                 binding.hlsPlayerView.visibility = View.GONE
                 binding.videoContainer.visibility = View.GONE
                 binding.surfaceView.visibility = View.GONE
-                binding.musicContainer.visibility = View.GONE
                 binding.ambientContainer.visibility = View.VISIBLE
-                binding.visualizerView.setPlaying(false)
                 if (!binding.btnSettings.hasFocus() && binding.settingsOverlay.visibility != View.VISIBLE) {
                     binding.btnSettings.requestFocus()
                 }
@@ -818,7 +769,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val isAmbientOpen = binding.ambientContainer.visibility == View.VISIBLE
         val isMirroring = service?.mirrorRunning?.value == true
         val hasHlsVideo = service?.videoLocation?.value != null
-        val hasMusic = (service?.audioOnly?.value == true || service?.trackInfo?.value?.title?.isNotBlank() == true) && !isMirroring && !hasHlsVideo
         val isHlsControllerVisible = hasHlsVideo && binding.hlsPlayerView.isControllerFullyVisible
 
         when (keyCode) {
@@ -844,10 +794,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     binding.hlsPlayerView.showController()
                     return true
                 }
-                if (hasMusic) {
-                    service?.dacpController?.prevItem()
-                    return true
-                }
                 return super.onKeyDown(keyCode, event)
             }
 
@@ -863,10 +809,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     binding.hlsPlayerView.showController()
                     return true
                 }
-                if (hasMusic) {
-                    service?.dacpController?.nextItem()
-                    return true
-                }
                 return super.onKeyDown(keyCode, event)
             }
 
@@ -879,7 +821,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     service?.toggleVideoPlayPause()
                     return true
                 }
-                if (hasMusic || isMirroring) {
+                if (isMirroring) {
                     if (service?.playing?.value == true) {
                         service.dacpPlayer.pause()
                     } else {
@@ -991,9 +933,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     binding.hlsPlayerView.hideController()
                     return true
                 }
-                // When in Screen Mirroring, HLS Video, or Audio, Back button disconnects the session
+                // When in Screen Mirroring or HLS Video, Back disconnects the session
                 // returning to ambient screen (matching Apple TV operate logic)
-                if (isMirroring || hasHlsVideo || hasMusic) {
+                if (isMirroring || hasHlsVideo) {
                     service?.disconnectSessions()
                     return true
                 }

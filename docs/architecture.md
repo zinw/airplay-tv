@@ -9,7 +9,7 @@
 ```
 +---------------------------------------------------------------------------------+
 |                                 iOS / macOS Sender                              |
-|   (Screen Mirroring, Safari HLS Video, YouTube AirPlay, Apple Music / Spotify)  |
+|   (Screen Mirroring, Safari HLS Video, YouTube AirPlay)                         |
 +---------------------------------------------------------------------------------+
                                          |
                        mDNS (Zeroconf) / RTSP / HTTP / RTP
@@ -74,7 +74,7 @@
 ### C. Background Service Layer (`AirPlayService.kt`)
 * Runs as an Android **Foreground Service** (`connectedDevice | mediaPlayback`).
 * Holds `WifiManager.MulticastLock` and `PowerManager.WakeLock` to prevent CPU throttling or network interface dormancy during background streaming.
-* Integrates with Android's `MediaSessionCompat` to bridge AirPlay's DACP metadata (Track Title, Artist, Album, Cover Art) and transport controls.
+* Integrates with Android's `MediaSessionCompat` for transport controls during casting sessions.
 
 ### D. Video & Rendering Pipeline
 * Decoupled architecture: Native video frames $\rightarrow$ `MediaCodec` $\rightarrow$ `SurfaceTexture` $\rightarrow$ Dedicated OpenGL ES rendering thread $\rightarrow$ `SurfaceView`.

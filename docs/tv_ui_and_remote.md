@@ -12,16 +12,12 @@
   * 3-step visual connection guide with large, readable typography and modern iconography.
   * "Settings" action button with high-contrast text color selector (`btn_text_focusable.xml`).
 
-* **Now Playing Music Screen**:
-  * High-resolution album artwork display with rounded corners and subtle shadow borders.
-  * Real-time audio amplitude visualizer (`VisualizerView.kt`).
-  * Dynamic track title, artist, and album metadata parsed from AirPlay DMAP packets.
-
 * **Modal TV Settings Dialog**:
   * Clean, D-Pad navigable overlay for instant configuration.
-  * Changing any setting (Device Name, Resolution, FPS limit, H.265, PIN, Low Latency, Overscan, Advertise Audio, Allow New Connections) immediately re-announces the server over mDNS after disconnecting active sessions — without requiring an app restart.
+  * Changing any setting (Device Name, Resolution, FPS limit, H.265, PIN, Overscan, Allow New Connections) immediately re-announces the server over mDNS after disconnecting active sessions — without requiring an app restart.
   * Performance HUD preference is persisted across launches; Info / Blue still toggles it during mirror.
   * Mirror HUD layout: top-right green signal bars; bottom-right `MediaCodec | rec=/dec= | WxH | Wi‑Fi band`.
+  * Standalone audio-only AirPlay is not advertised (no `_raop._tcp` / music-speaker toggle).
 
 ---
 
@@ -70,9 +66,5 @@ In **AirPlay TV**:
 | HLS Web Video        | D-Pad Navigation      | Navigates between on-screen player buttons               |
 | (Controls Visible)   | Center / Enter / OK   | Clicks focused player button (Rewind/FF/Next/Prev)        |
 |                      | Back / Return         | Dismisses on-screen controls without stopping video      |
-+----------------------+-----------------------+----------------------------------------------------------+
-| Music Streaming      | Center / Play-Pause   | Toggles DACP Play / Pause                                |
-|                      | Left / Right          | Skips to Previous Track / Next Track                     |
-|                      | Back / Return         | Stops audio playback and returns to Ambient Screen       |
 +----------------------+-----------------------+----------------------------------------------------------+
 ```
