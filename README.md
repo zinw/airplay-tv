@@ -28,10 +28,10 @@ An open-source, high-performance AirPlay receiver tailored specifically for **An
 | <img src="docs/screenshots/ambient_home_refresh.jpg" width="480" /> | <img src="docs/screenshots/settings_overlay_refresh.jpg" width="480" /> |
 | *Ready to connect with D-pad focusable Settings / language / PIN* | *D-Pad navigable settings with hot-reload* |
 
-| Screen Mirroring | HLS Web Video Player | Music & Visualizer |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/screen_mirroring.png" width="310" /> | <img src="docs/screenshots/hls_video.png" width="310" /> | <img src="docs/screenshots/music_playback.png" width="310" /> |
-| *Low-latency 1080p60/4K screen mirroring* | *HLS/MP4 video with full OSD timeline controls* | *ALAC/AAC with DMAP metadata & live audio bars* |
+| Screen Mirroring | HLS Web Video Player |
+| :---: | :---: |
+| <img src="docs/screenshots/screen_mirroring.png" width="420" /> | <img src="docs/screenshots/hls_video.png" width="420" /> |
+| *Low-latency 1080p60/4K screen mirroring with synced audio* | *HLS/MP4 video with full OSD timeline controls* |
 
 ---
 
@@ -45,17 +45,16 @@ While Apple AirPlay provides seamless screen mirroring and media casting across 
 
 ## ✨ Features
 
-- **🚀 Triple-Mode AirPlay Support**:
-  - **Screen Mirroring**: Real-time 1080p60 & 4K mirroring with H.264 / HEVC hardware acceleration.
+- **🚀 Dual-Mode AirPlay Support**:
+  - **Screen Mirroring**: Real-time 1080p60 & 4K mirroring with H.264 / HEVC hardware acceleration and synced mirror audio.
   - **Direct HLS Web Video**: Direct URL streaming for Safari, Bilibili, and YouTube (via FCUP reverse proxy) with full timeline seeking and OSD.
-  - **High-Fidelity Audio Casting**: Apple Lossless (ALAC) and AAC-ELD/AAC-LC streaming with album artwork and DMAP metadata.
+  - Standalone / audio-only AirPlay (music speaker / `_raop._tcp`) is **not** advertised or accepted.
 - **⚡ Ultra-Low Latency Audio**:
   - Powered by **Google Oboe** (native AAudio & OpenSL ES) bypassing Java AudioTrack overhead.
-  - Native jitter buffer with adaptive drift compensation.
+  - Native jitter buffer with adaptive drift compensation for Screen Mirroring audio.
 - **🎮 Dedicated Android TV 10-Foot Experience**:
   - Full D-Pad remote control navigation without requiring touch or mouse pointers.
   - Apple TV-style interactive control flow during active mirroring and media playback.
-  - Real-time audio visualizer and Now Playing overlay.
 - **⚙️ Dynamic TV Settings Overlay**:
   - On-the-fly resolution configuration (Auto, 4K, 1080p, 720p).
   - HEVC (H.265) hardware decoding toggle.
@@ -73,7 +72,7 @@ AirPlay TV uses a hybrid C++/Kotlin architecture:
 ```
 +-------------------------------------------------------------------------------+
 |                       iOS / macOS / iPadOS Client                             |
-|          (Control Center Mirroring, Safari HLS, Apple Music, YouTube)         |
+|          (Control Center Screen Mirroring, Safari HLS, YouTube)         |
 +-------------------------------------------------------------------------------+
                                        |
                      mDNS / RTSP / HTTP (Reverse PTTH) / RTP
@@ -137,9 +136,6 @@ For comprehensive technical deep dives, refer to the documentation in [`docs/`](
 | | Center / OK | Toggle Play / Pause |
 | | Back (Controls Visible) | Dismiss on-screen controller |
 | | Back (Controls Hidden) | Stop video and return to main screen |
-| **Music Streaming** | Center / OK | Toggle Play / Pause |
-| | Left / Right | Previous Track / Next Track |
-| | Back | Stop audio playback |
 
 ---
 
@@ -158,10 +154,9 @@ adb install -r AirPlayTV-<SHORT_HASH>-release.apk
 ### 2. Connecting from Apple Devices
 1. Ensure your Android TV and Apple device (iPhone, iPad, Mac) are connected to the **same Wi-Fi network**.
 2. Open **Control Center** on your iOS device:
-   - **Screen Mirroring**: Tap **Screen Mirroring** $\rightarrow$ select **Airplay TV**.
-   - **Music & Podcasts**: Open Apple Music or Spotify $\rightarrow$ tap the **AirPlay Audio** icon $\rightarrow$ select **Airplay TV**.
+   - **Screen Mirroring**: Tap **Screen Mirroring** $\rightarrow$ select **Airplay TV** (video + synced audio).
    - **Web / Online Video**: Tap the **AirPlay** icon inside Safari, YouTube, or Bilibili $\rightarrow$ select **Airplay TV**.
-
+3. Pure audio-only AirPlay (Apple Music / Spotify speaker target) is **not** supported and is not advertised.
 ### 3. Adjusting Settings
 On the Ambient screen, select the **SETTINGS** button using the remote's **OK / Center** button:
 - **Device Name**: Customize the broadcast name displayed in Apple devices.
@@ -169,7 +164,7 @@ On the Ambient screen, select the **SETTINGS** button using the remote's **OK / 
 - **Ultra-Low Latency Audio** / **Audio stability**: Trade delay vs glitch resistance on the Oboe path.
 - **H.265 / HEVC Decoding**: Enable/disable 4K HEVC hardware acceleration.
 - **Max Frame Rate & Resolution**: Limit stream resolution or frame rate to optimize for low-power chipsets.
-- **Overscan / Allow new connections / Advertise audio / Start on boot**: TV receiver polish aligned with common competitor settings.
+- **Overscan / Allow new connections / Start on boot**: TV receiver polish aligned with common competitor settings.
 
 See the [User Guide](docs/USER_GUIDE.md) for install, troubleshooting, and the [competitor comparison](docs/COMPARISON.md).
 

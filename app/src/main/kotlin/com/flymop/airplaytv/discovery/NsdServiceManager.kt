@@ -10,7 +10,6 @@ class NsdServiceManager(private val ctx: Context) {
 
     private val nsdManager = ctx.getSystemService(Context.NSD_SERVICE) as NsdManager
     private var multicastLock: WifiManager.MulticastLock? = null
-    private var raopRegistration: NsdManager.RegistrationListener? = null
     private var airplayRegistration: NsdManager.RegistrationListener? = null
 
     fun acquireMulticastLock() {
@@ -21,31 +20,10 @@ class NsdServiceManager(private val ctx: Context) {
         }
     }
 
-    fun registerRaop(serviceName: String, port: Int, txtRecords: Map<String, String>) {
-        val info = NsdServiceInfo().apply {
-            this.serviceName = serviceName
-            serviceType = "_raop._tcp"
-            this.port = port
-            txtRecords.forEach { (k, v) -> setAttribute(k, v) }
-        }
-
-        raopRegistration = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(info: NsdServiceInfo) {
-                Log.i(TAG, "RAOP registered: ${info.serviceName}")
-            }
-            override fun onRegistrationFailed(info: NsdServiceInfo, code: Int) {
-                Log.e(TAG, "RAOP registration failed: $code")
-            }
-            override fun onServiceUnregistered(info: NsdServiceInfo) {
-                Log.i(TAG, "RAOP unregistered")
-            }
-            override fun onUnregistrationFailed(info: NsdServiceInfo, code: Int) {
-                Log.e(TAG, "RAOP unregister failed: $code")
-            }
-        }
-        nsdManager.registerService(info, NsdManager.PROTOCOL_DNS_SD, raopRegistration)
-    }
-
+    /**
+     * Publish `_airplay._tcp` for Screen Mirroring / video AirPlay.
+     * Standalone `_raop._tcp` (AirTunes / music speaker) is intentionally not registered.
+     */
     fun registerAirplay(serviceName: String, port: Int, txtRecords: Map<String, String>, retryCount: Int = 0) {
         val targetName = if (retryCount == 0) serviceName else when (retryCount) {
             1 -> if (serviceName.contains("AirPlay", ignoreCase = true)) "$serviceName 2" else "$serviceName AirPlay"
@@ -93,10 +71,6 @@ class NsdServiceManager(private val ctx: Context) {
     }
 
     fun unregisterAll() {
-        raopRegistration?.let {
-            try { nsdManager.unregisterService(it) } catch (_: Exception) {}
-            raopRegistration = null
-        }
         airplayRegistration?.let {
             try { nsdManager.unregisterService(it) } catch (_: Exception) {}
             airplayRegistration = null

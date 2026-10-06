@@ -454,52 +454,7 @@
         app:surface_type="texture_view"
         app:use_controller="true" />
 
-    <!-- 4. Audio-Only Music UI -->
-    <LinearLayout
-        android:id="@+id/musicContainer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="48dp"
-        android:visibility="gone">
-
-        <ImageView
-            android:id="@+id/ivCoverArt"
-            android:layout_width="280dp"
-            android:layout_height="280dp"
-            android:background="@drawable/bg_card_modern"
-            android:contentDescription="@string/unknown_track"
-            android:scaleType="centerCrop" />
-
-        <TextView
-            android:id="@+id/tvTrackTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="@string/unknown_track"
-            android:textColor="@color/tv_text_primary"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvTrackArtist"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text=""
-            android:textColor="@color/tv_text_secondary"
-            android:textSize="20sp" />
-
-        <com.flymop.airplaytv.ui.view.VisualizerView
-            android:id="@+id/visualizerView"
-            android:layout_width="400dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="32dp" />
-
-    </LinearLayout>
-
-    <!-- 5. Performance HUD: top-right signal bars + bottom-right diagnostic line -->
+    <!-- 4. Performance HUD: top-right signal bars + bottom-right diagnostic line -->
     <FrameLayout
         android:id="@+id/hudOverlay"
         android:layout_width="match_parent"
@@ -1015,50 +970,6 @@
 
                         <androidx.appcompat.widget.SwitchCompat
                             android:id="@+id/switchAllowNewConn"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:clickable="false"
-                            android:focusable="false" />
-
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/rowSettingAdvertiseAudio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:background="@drawable/bg_setting_item_focusable"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/setting_advertise_audio"
-                                android:textColor="@color/tv_text_primary"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="3dp"
-                                android:text="@string/setting_advertise_audio_desc"
-                                android:textColor="@color/tv_text_secondary"
-                                android:textSize="13sp" />
-
-                        </LinearLayout>
-
-                        <androidx.appcompat.widget.SwitchCompat
-                            android:id="@+id/switchAdvertiseAudio"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:clickable="false"

@@ -11,7 +11,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 |---|---|---|---|---|---|---|---|
 | Screen mirroring (H.264) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | HEVC / H.265 mirror | ✅ | ✅ | ❌ (documented) | ❌ (H.264 focus) | — | ✅ (opt) | ◐ HW accel / UHD |
-| Audio-only / music cast | ✅ ALAC/AAC + DMAP art | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Audio-only / music cast | ❌ removed (mirror A/V only) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | HLS / URL video cast | ✅ ExoPlayer + OSD | ✅ | ✅ stream URL | ✅ `/play` | ◐ “video streaming” | ✅ | ✅ |
 | AirPlay photo receiver | ❌ deferred | — | ✅ | ✅ | ✅ claimed | ✅ | — |
 | Optional PIN pairing | ✅ (off by default) | ✅ | ✅ | ✅ (+ lockout) | — | ✅ | ◐ access control |
@@ -23,7 +23,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 | Picture-in-Picture | ❌ deferred | ✅ Manifest | ❌ | ❌ | — | — | — |
 | MediaSession / DACP remote | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | — |
 | Boot / background service | ✅ | ✅ | foreground app | ✅ | — | daemon | ✅ claimed |
-| Advertise audio/video split | ✅ (now in TV UI) | ✅ | ◐ mirror-audio toggle | ◐ mirror-audio toggle | — | CLI flags | — |
+| Advertise audio/video split | ❌ audio-only path removed; video/HLS still toggleable | ✅ | ◐ mirror-audio toggle | ◐ mirror-audio toggle | — | CLI flags | — |
 | Allow new conn while casting | ✅ (now in TV UI) | ✅ | — | — | — | `-nohold` | — |
 | In-app OTA updates | ✅ + China mirrors | F-Droid / Play | committed APKs | GitHub Releases | — | package mgr | Play Store |
 | Stable signed APKs | ✅ committed keystore | ✅ | ✅ | ✅ | debug | — | Play signing |
@@ -47,7 +47,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 - **Committed upload keystore** shared by debug + release so OTA overlays work across builds (post-1.0.4).
 - **Honor-focused mirror recovery**: `resetForServerRestart` (rename/settings without codec-thread death), mid-GOP mosaic guards, SPS/IDR patience — documented in prior 1.0.3–1.0.5 work.
 - **Oboe zero-JNI audio** with adaptive cushion + TV-visible latency vs stability control.
-- **Triple-mode leanback UX** (mirror + HLS OSD + music visualizer) tuned for D-pad, not phone-first Compose lists.
+- **Dual-mode leanback UX** (mirror + HLS OSD) tuned for D-pad, not phone-first Compose lists.
 - **Default PIN off** with clear home chip — matches iMirror/PhairPlay UX expectations on trusted home Wi-Fi.
 
 ## Implemented polish from this study (1.0.6)
@@ -55,7 +55,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 | Polish | Competitor cue |
 |---|---|
 | Persist Performance HUD preference | jqssun debug overlay sticks across launches; ours did not write `DEBUG_ENABLED` |
-| Expose Overscan / Allow new connections / Advertise audio / Boot start | Already wired in `Prefs` + native path; competitors surface them in UI |
+| Expose Overscan / Allow new connections / Boot start | Already wired in `Prefs` + native path; competitors surface them in UI |
 | Audio stability TV control | Expose adaptive cushion step without session tear-down (`audioConfigFlow`) |
 | Hot-apply low-latency toggle | **Removed in 1.0.11** — Exclusive AAudio fought FLUSH recovery on Honor; UxPlay-style shared media path only |
 | Disconnect before settings restart | Cleaner session teardown vs hanging iOS sockets after rename/codec changes |
