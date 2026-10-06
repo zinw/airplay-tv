@@ -427,10 +427,12 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         NativeBridge.nativeSetH265Enabled(nativeHandle, h265)
         NativeBridge.nativeSetCodecs(nativeHandle, alac, aac)
         val advertiseVideo = prefs.getBoolean(Prefs.ADVERTISE_VIDEO, Prefs.DEF_ADVERTISE_VIDEO)
-        val advertiseAudio = prefs.getBoolean(Prefs.ADVERTISE_AUDIO, Prefs.DEF_ADVERTISE_AUDIO)
         NativeBridge.nativeSetHlsEnabled(nativeHandle, advertiseVideo)
         NativeBridge.nativeSetLang(nativeHandle, "", "", resources.configuration.locales.toLanguageTags().replace(',', ':'))
-        NativeBridge.nativeSetAudioEnabled(nativeHandle, advertiseAudio)
+        // Never advertise standalone AirPlay audio (music / speaker). Mirror A/V keeps
+        // working via _airplay._tcp; clearing feature bit 9 + skipping _raop._tcp
+        // removes the audio-only discovery path.
+        NativeBridge.nativeSetAudioEnabled(nativeHandle, false)
         NativeBridge.nativeSetPlist(nativeHandle, "maxFPS", maxFps)
         NativeBridge.nativeSetPlist(nativeHandle, "overscanned", if (overscanned) 1 else 0)
         if (audioLatencyMs >= 0) {
@@ -453,16 +455,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             return
         }
         _serverPort.value = port
-        // register mdns services
-        val raopTxt = NativeBridge.nativeGetRaopTxtRecords(nativeHandle) ?: emptyMap()
+        // Register only _airplay._tcp (video / Screen Mirroring). Do not publish
+        // _raop._tcp — that is the classic AirTunes speaker / music target.
         val airplayTxt = NativeBridge.nativeGetAirplayTxtRecords(nativeHandle) ?: emptyMap()
-        val raopName = NativeBridge.nativeGetRaopServiceName(nativeHandle) ?: "AirPlay"
         val resolvedName = NativeBridge.nativeGetServerName(nativeHandle) ?: effectiveName
         _serverName.value = resolvedName
-
-        if (prefs.getBoolean(Prefs.ADVERTISE_AUDIO, Prefs.DEF_ADVERTISE_AUDIO)) {
-            nsdManager?.registerRaop(raopName, port, raopTxt)
-        }
         nsdManager?.registerAirplay(resolvedName, port, airplayTxt)
 
         _serverState.value = ServerState.RUNNING
@@ -715,15 +712,20 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
         clearPin()
-        mirroringAudio = usingScreen
+        if (!usingScreen) {
+            // Audio-only AirPlay (music / speaker) is unsupported. Drop the session
+            // so the sender does not sit on a half-open audio target.
+            log("Rejecting audio-only AirPlay session (ct=$ct spf=$spf)")
+            if (nativeHandle != 0L) {
+                NativeBridge.nativeDisconnectSessions(nativeHandle)
+            }
+            return
+        }
+        mirroringAudio = true
         applyAudioConfig()
         audioRenderer.start()
         audioRenderer.setFormat(ct, spf)
-        if (!usingScreen) _setPlaying(true)
-        if (!usingScreen && !_audioOnly.value) {
-            // pure music streaming (not screen mirroring audio)
-            _setAudioOnly(true)
-        }
+        _setAudioOnly(false)
         log("Audio format: ct=$ct spf=$spf screen=$usingScreen cushion=${audioRenderer.config.cushionMs}ms")
     }
 
@@ -901,6 +903,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     override fun onMirrorRunning(running: Boolean) {
         if (running) {
             videoRenderer.startSession()
+            _setAudioOnly(false)
         } else {
             videoRenderer.stopSession()
             _mirroringActive.value = false
@@ -908,8 +911,9 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
                 mirroringAudio = false
                 applyAudioConfig()
             }
+            // Do not flip into audio-only / music UI when mirror ends.
+            _setAudioOnly(false)
         }
-        _setAudioOnly(!running)
     }
 
     private fun _setAudioOnly(audioOnly: Boolean) {

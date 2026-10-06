@@ -10,7 +10,7 @@
     <string name="step_1_title">Same Wi‑Fi</string>
     <string name="step_1_desc">Join iPhone, iPad, or Mac to this TV’s network</string>
     <string name="step_2_title">Open Control Center</string>
-    <string name="step_2_desc">Tap Screen Mirroring or the AirPlay audio icon</string>
+    <string name="step_2_desc">Tap Screen Mirroring and select this TV</string>
     <string name="step_3_title">Choose this TV</string>
     <string name="step_3_desc">Select the device name shown here to start</string>
     <string name="status_broadcasting">Ready • Discoverable</string>
@@ -55,8 +55,6 @@
     <string name="setting_overscan_desc">Shrink the mirrored image if TV edges clip content</string>
     <string name="setting_allow_new_conn">Allow new connections</string>
     <string name="setting_allow_new_conn_desc">Let another Apple device take over while casting</string>
-    <string name="setting_advertise_audio">Advertise audio</string>
-    <string name="setting_advertise_audio_desc">Appear as an AirPlay speaker / music target</string>
     <string name="setting_boot_auto_start">Start on boot</string>
     <string name="setting_boot_auto_start_desc">Launch the AirPlay service after the TV powers on</string>
     <string name="setting_audio_stability">Audio stability</string>
@@ -102,10 +100,7 @@
     <string name="notification_pin_text">PIN: %1$s</string>
     <string name="stop_service">Stop</string>
 
-    <!-- Music & Media -->
-    <string name="unknown_track">Unknown Track</string>
-    <string name="airplay_audio_title">AirPlay Audio</string>
-    <string name="airplay_audio_subtitle">Connected Device • Streaming</string>
+    <!-- Downloads -->
     <string name="download_saved">Saved to %1$s</string>
     <string name="download_failed">Download failed</string>
 </resources>

@@ -10,7 +10,7 @@
     <string name="step_1_title">同一 Wi‑Fi</string>
     <string name="step_1_desc">将 iPhone、iPad 或 Mac 连接到此电视所在网络</string>
     <string name="step_2_title">打开控制中心</string>
-    <string name="step_2_desc">点按屏幕镜像或 AirPlay 音频图标</string>
+    <string name="step_2_desc">点按屏幕镜像并选择此电视</string>
     <string name="step_3_title">选择此电视</string>
     <string name="step_3_desc">选择此处显示的设备名称即可开始</string>
     <string name="status_broadcasting">就绪 • 可被发现</string>
@@ -55,8 +55,6 @@
     <string name="setting_overscan_desc">画面边缘被电视裁切时可缩小镜像画面</string>
     <string name="setting_allow_new_conn">允许新连接</string>
     <string name="setting_allow_new_conn_desc">投屏中时允许其他 Apple 设备接管连接</string>
-    <string name="setting_advertise_audio">广播音频接收</string>
-    <string name="setting_advertise_audio_desc">在 AirPlay 扬声器 / 音乐列表中显示本机</string>
     <string name="setting_boot_auto_start">开机自启</string>
     <string name="setting_boot_auto_start_desc">电视开机后自动启动 AirPlay 服务</string>
     <string name="setting_audio_stability">音频稳定性</string>
@@ -102,10 +100,7 @@
     <string name="notification_pin_text">PIN：%1$s</string>
     <string name="stop_service">停止</string>
 
-    <!-- Music & Media -->
-    <string name="unknown_track">未知曲目</string>
-    <string name="airplay_audio_title">AirPlay 音频</string>
-    <string name="airplay_audio_subtitle">已连接设备 • 正在流式传输</string>
+    <!-- Downloads -->
     <string name="download_saved">已保存到 %1$s</string>
     <string name="download_failed">下载失败</string>
 </resources>
