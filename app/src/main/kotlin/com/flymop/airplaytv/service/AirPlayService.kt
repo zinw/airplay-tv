@@ -429,10 +429,10 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val advertiseVideo = prefs.getBoolean(Prefs.ADVERTISE_VIDEO, Prefs.DEF_ADVERTISE_VIDEO)
         NativeBridge.nativeSetHlsEnabled(nativeHandle, advertiseVideo)
         NativeBridge.nativeSetLang(nativeHandle, "", "", resources.configuration.locales.toLanguageTags().replace(',', ':'))
-        // Never advertise standalone AirPlay audio (music / speaker). Mirror A/V keeps
-        // working via _airplay._tcp; clearing feature bit 9 + skipping _raop._tcp
-        // removes the audio-only discovery path.
-        NativeBridge.nativeSetAudioEnabled(nativeHandle, false)
+        // Feature bit 9 (Audio) is required for iOS Screen Mirroring to send synced
+        // audio to the TV. Clearing it in 1.0.22 left video-only on the receiver and
+        // sound on the phone. Always advertise audio capability for the protocol.
+        NativeBridge.nativeSetAudioEnabled(nativeHandle, true)
         NativeBridge.nativeSetPlist(nativeHandle, "maxFPS", maxFps)
         NativeBridge.nativeSetPlist(nativeHandle, "overscanned", if (overscanned) 1 else 0)
         if (audioLatencyMs >= 0) {
@@ -455,11 +455,15 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             return
         }
         _serverPort.value = port
-        // Register only _airplay._tcp (video / Screen Mirroring). Do not publish
-        // _raop._tcp — that is the classic AirTunes speaker / music target.
+        // Mirror synced audio rides RAOP. Skipping _raop._tcp in 1.0.22 broke TV
+        // sound during Screen Mirroring even though video still used _airplay._tcp.
+        // Publish both; music Now Playing UI stays removed separately.
+        val raopTxt = NativeBridge.nativeGetRaopTxtRecords(nativeHandle) ?: emptyMap()
         val airplayTxt = NativeBridge.nativeGetAirplayTxtRecords(nativeHandle) ?: emptyMap()
+        val raopName = NativeBridge.nativeGetRaopServiceName(nativeHandle) ?: "AirPlay"
         val resolvedName = NativeBridge.nativeGetServerName(nativeHandle) ?: effectiveName
         _serverName.value = resolvedName
+        nsdManager?.registerRaop(raopName, port, raopTxt)
         nsdManager?.registerAirplay(resolvedName, port, airplayTxt)
 
         _serverState.value = ServerState.RUNNING
@@ -712,19 +716,14 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
         clearPin()
-        if (!usingScreen) {
-            // Audio-only AirPlay (music / speaker) is unsupported. Drop the session
-            // so the sender does not sit on a half-open audio target.
-            log("Rejecting audio-only AirPlay session (ct=$ct spf=$spf)")
-            if (nativeHandle != 0L) {
-                NativeBridge.nativeDisconnectSessions(nativeHandle)
-            }
-            return
-        }
-        mirroringAudio = true
+        // Accept all RAOP audio (mirror and otherwise). UxPlay defaults usingScreen
+        // to false when the SETUP plist omits the key — rejecting that in 1.0.22
+        // was unsafe. Do not enter the removed music Now Playing UI.
+        mirroringAudio = usingScreen
         applyAudioConfig()
         audioRenderer.start()
         audioRenderer.setFormat(ct, spf)
+        if (!usingScreen) _setPlaying(true)
         _setAudioOnly(false)
         log("Audio format: ct=$ct spf=$spf screen=$usingScreen cushion=${audioRenderer.config.cushionMs}ms")
     }

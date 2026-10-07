@@ -17,7 +17,7 @@
   * Changing any setting (Device Name, Resolution, FPS limit, H.265, PIN, Overscan, Allow New Connections) immediately re-announces the server over mDNS after disconnecting active sessions — without requiring an app restart.
   * Performance HUD preference is persisted across launches; Info / Blue still toggles it during mirror.
   * Mirror HUD layout: top-right green signal bars; bottom-right `MediaCodec | rec=/dec= | WxH | Wi‑Fi band`.
-  * Standalone audio-only AirPlay is not advertised (no `_raop._tcp` / music-speaker toggle).
+  * Music Now Playing UI / Advertise-audio toggle remain removed; protocol still publishes `_raop._tcp` + audio feature bit for mirror synced sound.
 
 ---
 

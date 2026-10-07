@@ -48,7 +48,7 @@ While Apple AirPlay provides seamless screen mirroring and media casting across 
 - **🚀 Dual-Mode AirPlay Support**:
   - **Screen Mirroring**: Real-time 1080p60 & 4K mirroring with H.264 / HEVC hardware acceleration and synced mirror audio.
   - **Direct HLS Web Video**: Direct URL streaming for Safari, Bilibili, and YouTube (via FCUP reverse proxy) with full timeline seeking and OSD.
-  - Standalone / audio-only AirPlay (music speaker / `_raop._tcp`) is **not** advertised or accepted.
+  - Dedicated music Now Playing UI is removed; `_raop._tcp` / audio feature bits remain because Screen Mirroring synced audio needs them.
 - **⚡ Ultra-Low Latency Audio**:
   - Powered by **Google Oboe** (native AAudio & OpenSL ES) bypassing Java AudioTrack overhead.
   - Native jitter buffer with adaptive drift compensation for Screen Mirroring audio.
@@ -156,7 +156,7 @@ adb install -r AirPlayTV-<SHORT_HASH>-release.apk
 2. Open **Control Center** on your iOS device:
    - **Screen Mirroring**: Tap **Screen Mirroring** $\rightarrow$ select **Airplay TV** (video + synced audio).
    - **Web / Online Video**: Tap the **AirPlay** icon inside Safari, YouTube, or Bilibili $\rightarrow$ select **Airplay TV**.
-3. Pure audio-only AirPlay (Apple Music / Spotify speaker target) is **not** supported and is not advertised.
+3. There is no dedicated music Now Playing UI; prefer **Screen Mirroring** for video + synced TV audio.
 ### 3. Adjusting Settings
 On the Ambient screen, select the **SETTINGS** button using the remote's **OK / Center** button:
 - **Device Name**: Customize the broadcast name displayed in Apple devices.
