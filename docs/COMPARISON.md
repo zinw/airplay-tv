@@ -11,7 +11,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 |---|---|---|---|---|---|---|---|
 | Screen mirroring (H.264) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | HEVC / H.265 mirror | ✅ | ✅ | ❌ (documented) | ❌ (H.264 focus) | — | ✅ (opt) | ◐ HW accel / UHD |
-| Audio-only / music cast | ❌ removed (mirror A/V only) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Audio-only / music cast | ◐ protocol on (needed for mirror A/V); music UI removed | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | HLS / URL video cast | ✅ ExoPlayer + OSD | ✅ | ✅ stream URL | ✅ `/play` | ◐ “video streaming” | ✅ | ✅ |
 | AirPlay photo receiver | ❌ deferred | — | ✅ | ✅ | ✅ claimed | ✅ | — |
 | Optional PIN pairing | ✅ (off by default) | ✅ | ✅ | ✅ (+ lockout) | — | ✅ | ◐ access control |
@@ -23,7 +23,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 | Picture-in-Picture | ❌ deferred | ✅ Manifest | ❌ | ❌ | — | — | — |
 | MediaSession / DACP remote | ✅ | ✅ | ✅ | ✅ | ◐ | ✅ | — |
 | Boot / background service | ✅ | ✅ | foreground app | ✅ | — | daemon | ✅ claimed |
-| Advertise audio/video split | ❌ audio-only path removed; video/HLS still toggleable | ✅ | ◐ mirror-audio toggle | ◐ mirror-audio toggle | — | CLI flags | — |
+| Advertise audio/video split | ◐ audio always on for mirror; video/HLS still toggleable | ✅ | ◐ mirror-audio toggle | ◐ mirror-audio toggle | — | CLI flags | — |
 | Allow new conn while casting | ✅ (now in TV UI) | ✅ | — | — | — | `-nohold` | — |
 | In-app OTA updates | ✅ + China mirrors | F-Droid / Play | committed APKs | GitHub Releases | — | package mgr | Play Store |
 | Stable signed APKs | ✅ committed keystore | ✅ | ✅ | ✅ | debug | — | Play signing |
