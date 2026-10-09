@@ -92,7 +92,7 @@ Tag-driven release workflow (`.github/workflows/release.yml`):
 ```
 [bump versionName/versionCode in app/build.gradle.kts → commit → git tag vX.Y.Z → push tag]
              │
-             ├── 1. Checkout with submodules; JDK 17 + Gradle cache; NDK/CMake cache
+             ├── 1. Checkout (fetch-depth 0; shallow submodules + fallback); JDK 17 + Gradle cache; NDK/CMake on ubuntu-24.04
              ├── 2. Fail if tag vX.Y.Z ≠ versionName X.Y.Z
              ├── 3. ./gradlew assembleRelease (committed upload keystore)
              ├── 4. Rename to AirPlayTV-<version>-<abi>.apk (+ universal)

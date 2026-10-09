@@ -22,38 +22,65 @@ concurrency:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    # Pin Ubuntu so ANDROID_HOME stays at /usr/local/lib/android/sdk
+    # (ubuntu-latest image migration starts 2026-10-19).
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
     env:
-      # ubuntu-latest GitHub-hosted runners expose Android SDK here.
       ANDROID_HOME: /usr/local/lib/android/sdk
       NDK_VERSION: '27.0.12077973'
       CMAKE_VERSION: '3.22.1'
 
     steps:
-      - name: Checkout repository (with submodules)
-        uses: actions/checkout@v4.2.2
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
         with:
-          submodules: recursive
+          # Tags needed for release-notes git log; skip submodule clone here
+          # (FFmpeg full history via checkout submodules costs ~60s).
+          submodules: false
           fetch-depth: 0
 
+      - name: Init submodules (shallow, with full-fetch fallback)
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          # Prefer shallow clones to avoid FFmpeg full history.
+          # Submodules are pinned to specific SHAs; if a SHA is not near a tip,
+          # shallow fails and we fall back to a full fetch for that path only.
+          if git submodule update --init --recursive --depth 1 --jobs 4; then
+            echo "All submodules initialized shallowly."
+            exit 0
+          fi
+          echo "::warning::Bulk shallow submodule update failed; retrying per submodule with fallback."
+          while read -r _ path; do
+            if git submodule update --init --depth 1 --jobs 4 -- "$path"; then
+              echo "OK (shallow): $path"
+            else
+              echo "Shallow failed for $path; full fetch..."
+              git submodule update --init -- "$path"
+              echo "OK (full): $path"
+            fi
+          done < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$')
+          git submodule update --init --recursive --depth 1 --jobs 4 \
+            || git submodule update --init --recursive
+
       - name: Set up JDK 17
-        uses: actions/setup-java@v4.7.1
+        uses: actions/setup-java@v6.0.1
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
       - name: Cache Android NDK
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v6.1.0
         with:
           path: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
           key: ndk-${{ runner.os }}-${{ env.NDK_VERSION }}
 
       - name: Cache CMake
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v6.1.0
         with:
           path: ${{ env.ANDROID_HOME }}/cmake/${{ env.CMAKE_VERSION }}
           key: cmake-${{ runner.os }}-${{ env.CMAKE_VERSION }}
@@ -153,7 +180,7 @@ jobs:
           echo "Artifact naming OK for in-app OTA (ABI / universal)."
 
       - name: Upload workflow artifacts (dry-run / always retain build)
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: AirPlayTV-${{ steps.ver.outputs.version_name }}-release
           path: |
@@ -227,7 +254,7 @@ jobs:
 
       - name: Publish GitHub Release
         if: steps.ver.outputs.is_tag == 'true'
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ steps.ver.outputs.tag_name }}
           name: AirPlay TV ${{ steps.ver.outputs.version_name }}
