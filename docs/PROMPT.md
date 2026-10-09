@@ -127,7 +127,7 @@ adb logcat -v time -s AirPlayService NativeBridge UxPlay NsdServiceManager Audio
       */
      ```
 2. **Git Author Identity**:
-   - Committer / Author: `fly_mop <fly_mop@users.noreply.github.com>`
+   - Committer / Author: `fly_mop` (GitHub handle only; do not embed personal email addresses in docs or commits)
    - Do NOT add `Co-authored-by` trailers to commit messages.
 3. **Repository Name & Package**:
    - GitHub Repo: `flymop/airplay-tv`
