@@ -17,7 +17,7 @@ In-app updates (Settings / home status chip) check GitHub Releases and, on restr
 3. On iPhone/iPad/Mac: Control Center → **Screen Mirroring** → select this TV’s device name (video + synced audio).
 4. Optional: turn on **PIN Pairing** from the home chip or Settings if the network is shared.
 
-There is no dedicated music Now Playing UI. `_raop._tcp` and AirPlay audio feature advertising stay enabled because Screen Mirroring synced audio depends on them (1.0.22 regression when they were cleared).
+`_raop._tcp` and AirPlay audio feature bits stay advertised so Screen Mirroring synced audio works.
 
 ## Settings that matter
 

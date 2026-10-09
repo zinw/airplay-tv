@@ -3,7 +3,7 @@
 Feature-surface study of open-source AirPlay receivers and commercial Play Store claims.
 Sources: public README/issues/marketing pages only. No binary reverse-engineering.
 
-**Baseline:** zinw/airplay-tv (fork of flymop/airplay-tv) @ 1.0.6 — Kotlin + UxPlay-derived native core, Android TV leanback UI, Oboe audio, MediaCodec mirror + ExoPlayer HLS.
+**Baseline:** zinw/airplay-tv (standalone; originally based on flymop/airplay-tv) — Kotlin + UxPlay-derived native core, Android TV leanback UI, Oboe audio, MediaCodec mirror + ExoPlayer HLS.
 
 Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown from public docs
 
@@ -39,7 +39,7 @@ Legend: ✅ present · ◐ partial / claimed · ❌ absent · — N/A or unknown
 - **Miracast / Cast / DLNA** (AirScreen, PhairPlay WIP) — different protocols; out of architecture scope.
 - **Access-control lockout after failed PIN** (PhairPlay) — nice-to-have hardening; deferred.
 - **Richer developer decode knobs** (jqssun Compose settings: operating rate, frame-drop keys, SW ALAC force) — prefs already exist in our `Prefs`/`AirPlayService`; full TV UI for every knobs would clutter the 10-ft overlay — deferred beyond latency/stability step.
-- **True multi-protocol commercial surface** (AirScreen) — not a goal for this GPL AirPlay-focused fork.
+- **True multi-protocol commercial surface** (AirScreen) — not a goal for this GPL AirPlay-focused project.
 
 ## What we already do better (or uniquely well)
 

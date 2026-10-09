@@ -1,13 +1,23 @@
 name: Release Build & Publish
 
+# Tag is the release trigger; Gradle versionName must match.
+# Owner flow:
+#   1. Bump versionCode + versionName in app/build.gradle.kts
+#   2. Commit & push to main
+#   3. git tag vX.Y.Z && git push origin vX.Y.Z
+# CI verifies tag "vX.Y.Z" == versionName "X.Y.Z", builds signed APKs,
+# and publishes a GitHub Release with OTA-compatible asset names.
+#
+# workflow_dispatch: dry-run build (artifacts only, no GitHub Release / no tag).
+
 on:
   push:
-    branches:
-      - master
-      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -16,83 +26,218 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      # ubuntu-latest GitHub-hosted runners expose Android SDK here.
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      NDK_VERSION: '27.0.12077973'
+      CMAKE_VERSION: '3.22.1'
+
     steps:
       - name: Checkout repository (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.7.1
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Android NDK
-        run: |
-          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
-          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973" "cmake;3.22.1"
-          echo "ANDROID_NDK_ROOT=${ANDROID_HOME}/ndk/27.0.12077973" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/27.0.12077973" >> "$GITHUB_ENV"
+      - name: Cache Android NDK
+        uses: actions/cache@v4.2.3
+        with:
+          path: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+          key: ndk-${{ runner.os }}-${{ env.NDK_VERSION }}
 
-      - name: Compute Short SHA and Release Metadata
-        id: meta
+      - name: Cache CMake
+        uses: actions/cache@v4.2.3
+        with:
+          path: ${{ env.ANDROID_HOME }}/cmake/${{ env.CMAKE_VERSION }}
+          key: cmake-${{ runner.os }}-${{ env.CMAKE_VERSION }}
+
+      - name: Setup Android NDK & CMake
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "tag_name=v${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "release_name=Release v${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(ls -1 "${ANDROID_HOME}"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1 || true)"
+          fi
+          if [ -z "${SDKMANAGER}" ] || [ ! -x "${SDKMANAGER}" ]; then
+            echo "::error::sdkmanager not found under ${ANDROID_HOME}"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+          echo "ANDROID_NDK_ROOT=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Read Gradle version & validate tag
+        id: ver
+        run: |
+          set -euo pipefail
+          VERSION_NAME=$(sed -nE 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)
+          VERSION_CODE=$(sed -nE 's/.*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts | head -1)
+          if [ -z "$VERSION_NAME" ] || [ -z "$VERSION_CODE" ]; then
+            echo "::error::Could not parse versionName/versionCode from app/build.gradle.kts"
+            exit 1
+          fi
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
+          IS_TAG=false
+          DRY_RUN=true
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            IS_TAG=true
+            DRY_RUN=false
+            TAG="${GITHUB_REF_NAME}"
+            EXPECTED="${TAG#v}"
+            if [ "$EXPECTED" != "$VERSION_NAME" ]; then
+              echo "::error::Tag '${TAG}' does not match versionName '${VERSION_NAME}' in app/build.gradle.kts. Bump versionName/versionCode first, commit, then retag."
+              exit 1
+            fi
+            echo "tag_name=${TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_name=" >> "$GITHUB_OUTPUT"
+            echo "workflow_dispatch dry-run: building versionName=${VERSION_NAME} (versionCode=${VERSION_CODE}) without publishing a Release."
+          fi
+          echo "is_tag=${IS_TAG}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "Resolved versionName=${VERSION_NAME} versionCode=${VERSION_CODE} is_tag=${IS_TAG}"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --no-daemon
+      - name: Build Release APKs
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Prepare Release Artifacts
+        id: artifacts
         run: |
-          mkdir -p release-artifacts
-          SHORT_SHA="${{ steps.meta.outputs.short_sha }}"
-          
-          # Copy Universal & ABI-specific APKs
-          cp app/build/outputs/apk/release/app-universal-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-universal.apk"
-          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-armeabi-v7a.apk"
-          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-arm64-v8a.apk"
-          cp app/build/outputs/apk/release/app-x86_64-release.apk "release-artifacts/AirPlayTV-${SHORT_SHA}-x86_64.apk"
-          
-          cd release-artifacts
-          sha256sum *.apk > SHA256SUMS.txt
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version_name }}"
+          OUT=release-artifacts
+          mkdir -p "$OUT"
+          SRC=app/build/outputs/apk/release
 
-      - name: Create or Update GitHub Release
-        uses: softprops/action-gh-release@v2
+          copy_apk() {
+            local abi="$1" src_name="$2"
+            local src="${SRC}/${src_name}"
+            local dest="${OUT}/AirPlayTV-${VERSION}-${abi}.apk"
+            if [ ! -f "$src" ]; then
+              echo "::error::Missing APK: $src"
+              exit 1
+            fi
+            cp "$src" "$dest"
+            echo "Prepared $dest ($(du -h "$dest" | cut -f1))"
+          }
+
+          # Names include ABI (or universal) so AppUpdateChecker.pickApkAsset()
+          # can select device ABI first, then universal.
+          copy_apk armeabi-v7a app-armeabi-v7a-release.apk
+          copy_apk arm64-v8a   app-arm64-v8a-release.apk
+          copy_apk x86_64      app-x86_64-release.apk
+          copy_apk universal   app-universal-release.apk
+
+          (
+            cd "$OUT"
+            sha256sum AirPlayTV-"${VERSION}"-*.apk | tee SHA256SUMS.txt
+            while read -r hash file; do
+              printf '%s  %s\n' "$hash" "$file" > "${file}.sha256"
+            done < SHA256SUMS.txt
+            test -f "AirPlayTV-${VERSION}-arm64-v8a.apk"
+            test -f "AirPlayTV-${VERSION}-universal.apk"
+          )
+          echo "Artifact naming OK for in-app OTA (ABI / universal)."
+
+      - name: Upload workflow artifacts (dry-run / always retain build)
+        uses: actions/upload-artifact@v4.6.2
         with:
-          tag_name: ${{ steps.meta.outputs.tag_name }}
-          name: ${{ steps.meta.outputs.release_name }}
-          target_commitish: ${{ github.sha }}
+          name: AirPlayTV-${{ steps.ver.outputs.version_name }}-release
+          path: |
+            release-artifacts/*.apk
+            release-artifacts/*.sha256
+            release-artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Generate release notes body
+        if: steps.ver.outputs.is_tag == 'true'
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version_name }}"
+          CODE="${{ steps.ver.outputs.version_code }}"
+          TAG="${{ steps.ver.outputs.tag_name }}"
+          NOTES_FILE=release-notes.md
+
+          {
+            echo "## AirPlay TV ${VERSION}"
+            echo
+            echo "Signed release APKs for Android TV. Prefer **arm64-v8a** on modern TVs (e.g. Honor Smart Screen X1 / LOK-350)."
+            echo
+            echo "versionCode: ${CODE}"
+            echo
+            echo "### Artifacts"
+            echo
+            echo "| Asset | ABI |"
+            echo "| --- | --- |"
+            echo "| \`AirPlayTV-${VERSION}-arm64-v8a.apk\` | 64-bit ARM (recommended) |"
+            echo "| \`AirPlayTV-${VERSION}-armeabi-v7a.apk\` | 32-bit ARM |"
+            echo "| \`AirPlayTV-${VERSION}-x86_64.apk\` | x86_64 / emulators |"
+            echo "| \`AirPlayTV-${VERSION}-universal.apk\` | All ABIs |"
+            echo "| \`SHA256SUMS.txt\` / \`*.sha256\` | Checksums |"
+            echo
+            echo "### Install"
+            echo
+            echo '```bash'
+            echo "adb install -r AirPlayTV-${VERSION}-arm64-v8a.apk"
+            echo '```'
+            echo
+            echo "Overlay upgrades work from **1.0.4+** (same upload keystore)."
+            echo
+            echo "### SHA-256"
+            echo
+            echo '```'
+            cat release-artifacts/SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "### Changes"
+            echo
+          } > "$NOTES_FILE"
+
+          # Commits since previous version tag (best-effort)
+          PREV=$(git tag -l 'v*' --sort=-v:refname | grep -vxF "$TAG" | head -1 || true)
+          if [ -n "$PREV" ]; then
+            echo "Commits since ${PREV}:" >> "$NOTES_FILE"
+            echo >> "$NOTES_FILE"
+            git log --pretty=format:'- %s (%h)' "${PREV}..${TAG}" >> "$NOTES_FILE" || true
+            echo >> "$NOTES_FILE"
+          else
+            echo "- Initial tagged release build for ${VERSION}." >> "$NOTES_FILE"
+          fi
+
+          {
+            echo "body<<EOF"
+            cat "$NOTES_FILE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        if: steps.ver.outputs.is_tag == 'true'
+        uses: softprops/action-gh-release@v2.2.2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag_name }}
+          name: AirPlay TV ${{ steps.ver.outputs.version_name }}
           draft: false
           prerelease: false
-          body: |
-            ### 📺 AirPlay TV Production Release `${{ steps.meta.outputs.short_sha }}`
-            
-            **Commit:** [`${{ steps.meta.outputs.short_sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-            
-            #### 📦 Included Artifacts
-            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-armeabi-v7a.apk`: Lightweight build for 32-bit ARM TVs / TV sticks (~13 MB)
-            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-arm64-v8a.apk`: Lightweight build for 64-bit ARM TVs / Shields (~17 MB)
-            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-x86_64.apk`: Build for x86_64 Android TV / Emulators (~17 MB)
-            - `AirPlayTV-${{ steps.meta.outputs.short_sha }}-universal.apk`: All-in-one APK containing all ABIs (~30 MB)
-            - `SHA256SUMS.txt`: SHA-256 Checksums for all binaries
-            
-            #### 🚀 Quick Install via ADB
-            ```bash
-            adb connect <YOUR_ANDROID_TV_IP>
-            # For 32-bit Chromecast with Google TV / Fire TV / Mi Box:
-            adb install -r AirPlayTV-${{ steps.meta.outputs.short_sha }}-armeabi-v7a.apk
-            ```
+          generate_release_notes: true
+          body: ${{ steps.notes.outputs.body }}
           files: |
             release-artifacts/*.apk
+            release-artifacts/*.sha256
             release-artifacts/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

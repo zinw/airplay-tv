@@ -1,237 +1,272 @@
 <div align="center">
   <img src="docs/assets/app_icon.png" width="128" height="128" alt="AirPlay TV Icon" />
   <h1>AirPlay TV</h1>
-  <p><strong>High-performance, open-source AirPlay receiver tailored specifically for Android TV &amp; Google TV.</strong></p>
+  <p><strong>开源高性能 AirPlay 接收端 · Android TV / Google TV</strong><br />
+  <em>Open-source high-performance AirPlay receiver for Android TV &amp; Google TV</em></p>
 
   <p>
     <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3" /></a>
     <a href="https://developer.android.com/tv"><img src="https://img.shields.io/badge/Platform-Android%20TV%208.0%2B-green.svg" alt="Platform" /></a>
     <a href="https://developer.android.com/ndk"><img src="https://img.shields.io/badge/Arch-arm64--v8a%20%7C%20armeabi--v7a%20%7C%20x86__64-orange.svg" alt="Architecture" /></a>
-    <a href="https://github.com/flymop/airplay-tv/releases"><img src="https://img.shields.io/github/v/release/flymop/airplay-tv?include_prereleases&color=brightgreen&label=Auto%20Release" alt="Release" /></a>
+    <a href="https://github.com/zinw/airplay-tv/releases"><img src="https://img.shields.io/github/v/release/zinw/airplay-tv?include_prereleases&color=brightgreen&label=Release" alt="Release" /></a>
   </p>
-</div>
 
-<br />
+  <p><a href="#-中文">中文</a> · <a href="#-english">English</a> · <a href="README.en.md">English only</a></p>
+</div>
 
 <p align="center">
   <img src="docs/assets/app_banner.png" width="100%" alt="AirPlay TV Banner" />
 </p>
 
-An open-source, high-performance AirPlay receiver tailored specifically for **Android TV** and Google TV devices. Built on top of a native C/C++ RTSP/RAOP core with Google Oboe and hardware-accelerated MediaCodec video pipelines.
-
 ---
 
-## 📸 Screenshots
+# 中文
 
-| Ambient Home Screen | TV Settings Modal |
+基于 [UxPlay](https://github.com/FDH2/UxPlay) 原生 RTSP/RAOP 核心的 Android TV AirPlay 接收端：屏幕镜像（H.264/H.265 + 同步音频）、HLS/网页视频投屏，以及面向遥控器的 10 英尺 Leanback UI。仓库已独立于原 [flymop/airplay-tv](https://github.com/flymop/airplay-tv) 维护。
+
+## 功能
+
+- **屏幕镜像**：实时 1080p60 / 4K，MediaCodec 硬解 H.264、HEVC（可开关），镜像音频经 Oboe 低延迟输出。
+- **HLS / 网页视频**：Safari、Bilibili、YouTube（经 FCUP）直链播放，OSD 进度与遥控器控制。
+- **Android TV 体验**：D-Pad 导航、设置热更新、可选 PIN 配对、开机自启、性能 HUD。
+- **应用内 OTA**：查询 GitHub Releases，按设备 ABI 下载 APK（含国内镜像回退）。
+- **16KB 页大小**：适配较新 Android 设备内存页对齐要求。
+
+> 不提供独立「仅音频 / 音乐 Now Playing」界面；`_raop._tcp` 与音频能力位仍会广播，因为**屏幕镜像同步音频**依赖它们。
+
+## 支持设备
+
+在 **荣耀智慧屏 X1（LOK-350）** 等真机上验证；推荐安装 **arm64-v8a** APK。亦提供 `armeabi-v7a`、`x86_64`、universal。最低 Android TV 8.0（API 26）。
+
+## 截图
+
+| 主界面（空闲） | 设置 |
 | :---: | :---: |
-| <img src="docs/screenshots/ambient_home_refresh.jpg" width="480" /> | <img src="docs/screenshots/settings_overlay_refresh.jpg" width="480" /> |
-| *Ready to connect with D-pad focusable Settings / language / PIN* | *D-Pad navigable settings with hot-reload* |
+| <img src="docs/screenshots/ambient_home.png" width="480" alt="Ambient home" /> | <img src="docs/screenshots/settings_overlay.png" width="480" alt="Settings" /> |
 
-| Screen Mirroring | HLS Web Video Player |
-| :---: | :---: |
-| <img src="docs/screenshots/screen_mirroring.png" width="420" /> | <img src="docs/screenshots/hls_video.png" width="420" /> |
-| *Low-latency 1080p60/4K screen mirroring with synced audio* | *HLS/MP4 video with full OSD timeline controls* |
+屏幕镜像实拍可由维护者后续放入 `docs/screenshots/screen_mirroring_photo.jpg`（此处不挂失效链接）。
 
----
+## 架构
 
-## 📖 Background
+```mermaid
+flowchart LR
+  subgraph Apple["iOS / macOS / iPadOS"]
+    CC["控制中心 / Safari / App"]
+  end
 
-While Apple AirPlay provides seamless screen mirroring and media casting across Apple ecosystems, official AirPlay receiver support on Android TV devices is rare or locked behind proprietary paid apps. 
+  subgraph Discovery["发现"]
+    MDNS["mDNS<br/>_airplay._tcp + _raop._tcp"]
+  end
 
-**AirPlay TV** bridges this gap by combining the native protocol capabilities of [UxPlay](https://github.com/FDH2/UxPlay) with Android TV optimizations derived from [android-airplay-server](https://github.com/jqssun/android-airplay-server). It delivers an intuitive 10-foot Leanback experience, hardware-accelerated video rendering, and zero-JNI low-latency audio output.
+  subgraph Protocol["协议"]
+    RTSP["RTSP / FairPlay 配对"]
+    RTP["RTP 音视频"]
+  end
 
----
+  subgraph TV["Android TV · AirPlay TV"]
+    SVC["AirPlayService + NsdManager"]
+    UX["UxPlay 原生核心"]
+    VID["MediaCodec H.264/H.265<br/>→ GL / Surface"]
+    AUD["FFmpeg ALAC/AAC<br/>→ Oboe / AudioTrack 路径"]
+    HLS["Media3 ExoPlayer HLS"]
+    OTA["AppUpdateChecker<br/>→ GitHub Releases"]
+  end
 
-## ✨ Features
-
-- **🚀 Dual-Mode AirPlay Support**:
-  - **Screen Mirroring**: Real-time 1080p60 & 4K mirroring with H.264 / HEVC hardware acceleration and synced mirror audio.
-  - **Direct HLS Web Video**: Direct URL streaming for Safari, Bilibili, and YouTube (via FCUP reverse proxy) with full timeline seeking and OSD.
-  - Dedicated music Now Playing UI is removed; `_raop._tcp` / audio feature bits remain because Screen Mirroring synced audio needs them.
-- **⚡ Ultra-Low Latency Audio**:
-  - Powered by **Google Oboe** (native AAudio & OpenSL ES) bypassing Java AudioTrack overhead.
-  - Native jitter buffer with adaptive drift compensation for Screen Mirroring audio.
-- **🎮 Dedicated Android TV 10-Foot Experience**:
-  - Full D-Pad remote control navigation without requiring touch or mouse pointers.
-  - Apple TV-style interactive control flow during active mirroring and media playback.
-- **⚙️ Dynamic TV Settings Overlay**:
-  - On-the-fly resolution configuration (Auto, 4K, 1080p, 720p).
-  - HEVC (H.265) hardware decoding toggle.
-  - Configurable PIN code pairing and frame rate limits.
-  - Instant server re-announcement on setting changes.
-- **🛡️ 16KB Page-Size Ready**:
-  - Built with modern Android 15+ 16KB memory page compatibility.
-
----
-
-## 🏗️ Architecture Overview
-
-AirPlay TV uses a hybrid C++/Kotlin architecture:
-
-```
-+-------------------------------------------------------------------------------+
-|                       iOS / macOS / iPadOS Client                             |
-|          (Control Center Screen Mirroring, Safari HLS, YouTube)         |
-+-------------------------------------------------------------------------------+
-                                       |
-                     mDNS / RTSP / HTTP (Reverse PTTH) / RTP
-                                       |
-                                       v
-+-------------------------------------------------------------------------------+
-|                             Android TV App                                    |
-|                                                                               |
-|  +---------------------+   +---------------------+   +---------------------+  |
-|  |  MainActivity (UI)  |   | AirPlayService (BG) |   | TV Settings Overlay |  |
-|  |  - 10-ft Leanback   |   | - Foreground Service|   | - Dynamic Hot-Reload|  |
-|  |  - D-Pad Navigator  |   | - Multicast/WakeLock|   | - StateFlow Binding |  |
-|  |  - Live Status & HUD|   | - MediaSession DACP |   |                     |  |
-|  +---------------------+   +---------------------+   +---------------------+  |
-|                                       |                                       |
-|                                  JNI Bridge                                   |
-|                                       |                                       |
-|  +---------------------+   +---------------------+   +---------------------+  |
-|  | UxPlay RAOP Core    |   | Native Audio Engine |   | Android DNSSD Shim  |  |
-|  | - RTSP / FairPlay   |   | - Google Oboe Engine|   | - NsdManager        |  |
-|  | - Plist & FCUP      |   | - FFmpeg ALAC / AAC |   | - Conflict Handling |  |
-|  | - 2MB Socket Buffer |   | - Timeline Jitter   |   |                     |  |
-|  +---------------------+   +---------------------+   +---------------------+  |
-|                                       |                                       |
-|  +---------------------+   +---------------------+   +---------------------+  |
-|  | Decoupled GL Render |   | MediaCodec (HW AVC) |   | Media3 ExoPlayer    |  |
-|  | - Dedicated Thread  |   | MediaCodec (HW HEVC)|   | - HLS / MP4 Stream  |  |
-|  | - VBO Quad Blit     |   | - Off-screen Surface|   | - Live OSD Controls |  |
-|  +---------------------+   +---------------------+   +---------------------+  |
-+-------------------------------------------------------------------------------+
+  CC --> MDNS --> SVC
+  CC --> RTSP --> UX
+  UX --> RTP
+  RTP --> VID
+  RTP --> AUD
+  RTSP --> HLS
+  OTA -.->|下载 ABI 匹配 APK| SVC
 ```
 
-For comprehensive technical deep dives, refer to the documentation in [`docs/`](docs/):
-- [User Guide](docs/USER_GUIDE.md)
-- [Competitor Comparison](docs/COMPARISON.md)
-- [System Architecture](docs/architecture.md)
-- [Building & Debugging Guide](docs/building_and_debugging.md)
-- [Video Rendering Pipeline](docs/video_pipeline.md)
-- [Low-Latency Audio Pipeline](docs/audio_pipeline.md)
-- [HLS Video & Network Protocol](docs/hls_and_network.md)
-- [Android TV UI & Remote Control UX](docs/tv_ui_and_remote.md)
-- [AI Agent Context & System Prompt](docs/PROMPT.md)
+## 安装与升级
 
----
+1. 从 [Releases](https://github.com/zinw/airplay-tv/releases) 下载 APK（优先 `AirPlayTV-<version>-arm64-v8a.apk`）。
+2. 侧载安装，例如：
 
-## 🕹️ Remote Controller Guide
-
-| Scenario | Remote Button | Action |
-| :--- | :--- | :--- |
-| **Ambient / Idle Screen** | D-Pad Navigation | Move focus across buttons and settings |
-| | Center / OK | Open Settings or activate button |
-| | Back | Exit application |
-| **Settings Overlay** | D-Pad Up / Down | Navigate setting items |
-| | Center / OK | Toggle switch or edit value |
-| | Back | Close Settings and return to main screen |
-| **Screen Mirroring** | Back | Instantly disconnect AirPlay session |
-| | Center / OK | Send DACP Play / Pause to iOS |
-| | Info / Blue Key | Toggle Performance HUD Overlay |
-| **HLS Video Playback** | Left / Right | Seek -10s / +10s |
-| | Up / Down | Show on-screen playback controller |
-| | Center / OK | Toggle Play / Pause |
-| | Back (Controls Visible) | Dismiss on-screen controller |
-| | Back (Controls Hidden) | Stop video and return to main screen |
-
----
-
-## 🚀 Getting Started & User Guide
-
-### 1. Installation
-Download the latest production release APK from [GitHub Releases](https://github.com/flymop/airplay-tv/releases) or install via ADB:
 ```bash
-# Connect to your Android TV
-adb connect <TV_IP_ADDRESS>
-
-# Install the latest release APK
-adb install -r AirPlayTV-<SHORT_HASH>-release.apk
+adb install -r AirPlayTV-1.0.23-arm64-v8a.apk
 ```
 
-### 2. Connecting from Apple Devices
-1. Ensure your Android TV and Apple device (iPhone, iPad, Mac) are connected to the **same Wi-Fi network**.
-2. Open **Control Center** on your iOS device:
-   - **Screen Mirroring**: Tap **Screen Mirroring** $\rightarrow$ select **Airplay TV** (video + synced audio).
-   - **Web / Online Video**: Tap the **AirPlay** icon inside Safari, YouTube, or Bilibili $\rightarrow$ select **Airplay TV**.
-3. There is no dedicated music Now Playing UI; prefer **Screen Mirroring** for video + synced TV audio.
-### 3. Adjusting Settings
-On the Ambient screen, select the **SETTINGS** button using the remote's **OK / Center** button:
-- **Device Name**: Customize the broadcast name displayed in Apple devices.
-- **Performance HUD**: Toggle real-time overlay — top-right Wi‑Fi signal bars and bottom-right `decoder | rec/dec | WxH | band` line during mirror (persisted).
-- **Ultra-Low Latency Audio** / **Audio stability**: Trade delay vs glitch resistance on the Oboe path.
-- **H.265 / HEVC Decoding**: Enable/disable 4K HEVC hardware acceleration.
-- **Max Frame Rate & Resolution**: Limit stream resolution or frame rate to optimize for low-power chipsets.
-- **Overscan / Allow new connections / Start on boot**: TV receiver polish aligned with common competitor settings.
+3. **1.0.4 及以后**使用同一上传证书，可直接覆盖升级。若仍在 **1.0.1–1.0.3**，需先卸载再装新版。
 
-See the [User Guide](docs/USER_GUIDE.md) for install, troubleshooting, and the [competitor comparison](docs/COMPARISON.md).
+应用内更新：冷启动检查 `releases/latest`，确认后下载；网络受限时依次尝试 GitHub → ghproxy → ghfast。
 
----
+## 使用
 
-## 🛠️ Building from Source
+1. 电视与 Apple 设备同一 Wi‑Fi（关闭 AP 隔离，允许组播/mDNS）。
+2. 打开 AirPlay TV，保持就绪界面或前台服务运行。
+3. 控制中心 → **屏幕镜像** → 选择本机名称（画面 + 同步声音）。
+4. 网页视频：Safari / 支持 AirPlay 的 App 内点 AirPlay 图标。
+5. 可选：主界面开启 PIN 配对。
 
-### Quick Build
+遥控器：镜像中 **返回** 断开；**确认** 播放/暂停；**信息/蓝键** 切换 HUD。HLS：左右快进退，上下显示控制条。
+
+更多说明见 [用户指南](docs/USER_GUIDE.md)。
+
+## 从源码构建
+
 ```bash
-# 1. Clone the repository with submodules
-git clone --recursive https://github.com/flymop/airplay-tv.git
+git clone --recursive https://github.com/zinw/airplay-tv.git
 cd airplay-tv
-
-# 2. Build Debug APK
-./gradlew assembleDebug
-
-# 3. Install on TV via ADB
-adb connect <TV_IP_ADDRESS>:<PORT>
-./gradlew installDebug
+./gradlew assembleRelease
 ```
 
-For full details on Wireless ADB setup, logcat filtering, Performance HUD diagnostics, and NDK toolchains, see the **[Building & Debugging Guide](docs/building_and_debugging.md)**.
+产物在 `app/build/outputs/apk/release/`（按 ABI 拆分 + universal）。调试与 release 均使用仓库内 `keystore/airplaytv-upload.keystore`（见 `keystore/README.md`），以保持与 1.0.4+ 相同的签名、支持覆盖安装。
+
+**请勿修改** `applicationId`（`com.flymop.airplaytv`）或应用显示名，否则无法覆盖已安装版本。
+
+工具链：JDK 17、NDK `27.0.12077973`、CMake `3.22.1`、compileSdk 34。详见 [构建与调试](docs/building_and_debugging.md)。
+
+## 发布新版本（仅打 tag）
+
+`versionName` / `versionCode` 以 `app/build.gradle.kts` 为准；**tag 必须与 versionName 一致**，否则 CI 失败。
+
+```bash
+# 1. 编辑 app/build.gradle.kts：提高 versionCode，设置 versionName（如 "1.0.24"）
+# 2. 提交并推送到 main
+git add app/build.gradle.kts && git commit -m "chore: bump to 1.0.24" && git push origin main
+
+# 3. 打 tag 并推送（不要本地打 APK）
+git tag v1.0.24
+git push origin v1.0.24
+```
+
+GitHub Actions（[`.github/workflows/release.yml`](.github/workflows/release.yml)）会：校验 `v1.0.24` == `versionName`、签名构建、发布 Release，资源名为 `AirPlayTV-1.0.24-arm64-v8a.apk` 等，正文含 `versionCode: N` 与 SHA-256（供应用内 OTA）。
+
+干跑（只构建、上传 workflow artifact，不发 Release）：
+
+```bash
+gh workflow run release.yml --ref <your-branch>
+```
+
+```mermaid
+flowchart LR
+  A["bump versionName/versionCode<br/>in app/build.gradle.kts"] --> B["git tag vX.Y.Z"]
+  B --> C["GitHub Actions<br/>assembleRelease + 签名"]
+  C --> D["GitHub Release<br/>AirPlayTV-X.Y.Z-&lt;abi&gt;.apk"]
+  D --> E["应用内 OTA<br/>releases/latest"]
+```
+
+## 致谢与许可
+
+- 原项目 [flymop/airplay-tv](https://github.com/flymop/airplay-tv)
+- [FDH2/UxPlay](https://github.com/FDH2/UxPlay)、[jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server)
+- [google/oboe](https://github.com/google/oboe)、[FFmpeg](https://ffmpeg.org)、[libplist](https://github.com/libimobiledevice/libplist)
+
+**GNU GPL-3.0** — 见 [LICENSE](LICENSE)。
+
+技术文档：[架构](docs/architecture.md) · [视频管线](docs/video_pipeline.md) · [音频管线](docs/audio_pipeline.md) · [HLS/网络](docs/hls_and_network.md) · [TV UI](docs/tv_ui_and_remote.md) · [对比](docs/COMPARISON.md) · [PROMPT](docs/PROMPT.md)
 
 ---
 
-## 📲 In-App Update Check (Self-Testing Builds)
+# English
 
-On cold start the app queries the public GitHub Releases API for [`zinw/airplay-tv`](https://github.com/zinw/airplay-tv/releases/latest). If a newer build is found, a confirm dialog is shown; only after the user accepts does the app download the release APK and hand it to the system package installer. Offline / rate-limit failures are soft (logged, never crash or block the home screen).
+Open-source AirPlay receiver for **Android TV / Google TV**, built on a native [UxPlay](https://github.com/FDH2/UxPlay) RTSP/RAOP core: screen mirroring (H.264/H.265 + synced audio), HLS/web video casting, and a D-pad Leanback UI. This repo is maintained independently of the original [flymop/airplay-tv](https://github.com/flymop/airplay-tv).
 
-Downloads try **GitHub first**, then public prefix mirrors with backoff (for flaky access from some regions, including China mainland):
+For a standalone English copy, see [README.en.md](README.en.md).
 
-1. `https://github.com/.../releases/download/...` (primary)
-2. `https://ghproxy.net/https://github.com/.../releases/download/...`
-3. `https://ghfast.top/https://github.com/.../releases/download/...`
+## Features
 
-(`mirror.ghproxy.com` was probed and is currently omitted.) Progress shows the active source; failures show a reason plus **Retry** / **Cancel**, and the APK is size-checked (GitHub asset size / Content-Length) plus ZIP magic before the installer is launched so truncated files do not surface as 「应用未安装」.
+- **Screen mirroring** — 1080p60 / 4K, MediaCodec H.264 & optional HEVC, low-latency mirror audio via Oboe.
+- **HLS / web video** — Safari, Bilibili, YouTube (FCUP) with OSD and remote controls.
+- **Android TV UX** — D-pad navigation, hot-reload settings, optional PIN, start on boot, performance HUD.
+- **In-app OTA** — GitHub Releases + ABI selection (+ mirror fallbacks).
+- **16KB page-size** ready.
 
-### How to publish a test release the updater can see
+No dedicated audio-only / music Now Playing UI. `_raop._tcp` and audio feature bits stay advertised because **mirror synced audio** needs them.
 
-1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
-2. Build an APK, e.g. `./gradlew assembleDebug` or `./gradlew assembleRelease`
-   (both use `keystore/airplaytv-upload.keystore` — see `keystore/README.md`).
-3. Create a **non-draft** GitHub Release on `zinw/airplay-tv`:
-   - **Tag** (required for name compare): `v{versionName}` such as `v1.0.4`.
-   - **Preferred for versionCode compare**: put a line `versionCode: N` in the release body (same `N` as `app/build.gradle.kts`), **or** use tag metadata `v1.0.4+N`.
-   - **Attach** a clearly named `.apk` asset, for example:
-     - `AirPlayTV-1.0.4-universal.apk`, or
-     - ABI-specific names containing `arm64-v8a`, `armeabi-v7a`, `x86_64`, or `universal` (the app prefers the device ABI, then universal).
-4. Publish the release. Relaunch the installed older build on the TV; it should prompt once per process start.
+## Supported devices
 
-**Signing / overlay:** From **1.0.4** onward, builds share one committed upload keystore, so OTA overlays work. Upgrading from **1.0.1–1.0.3** still needs one uninstall (those Releases each used a different ephemeral debug cert).
+Tested on **Honor Smart Screen X1 (LOK-350)**; prefer the **arm64-v8a** APK. Also ships `armeabi-v7a`, `x86_64`, and universal. Min Android TV 8.0 (API 26).
 
-Version comparison order: body `versionCode` → tag `+versionCode` / numeric tag → SemVer `versionName` from the tag.
+## Screenshots
 
----
+| Idle home | Settings |
+| :---: | :---: |
+| <img src="docs/screenshots/ambient_home.png" width="480" alt="Ambient home" /> | <img src="docs/screenshots/settings_overlay.png" width="480" alt="Settings" /> |
 
-## 🤝 Acknowledgements & Credits
+A real mirroring photo can be added later as `docs/screenshots/screen_mirroring_photo.jpg` (no broken image link here).
 
-This project is built upon the incredible work of the open-source community:
+## Architecture
 
-- [**jqssun/android-airplay-server**](https://github.com/jqssun/android-airplay-server) — The original open-source AirPlay receiver for Android.
-- [**FDH2/UxPlay**](https://github.com/FDH2/UxPlay) — The foundational open-source AirPlay server backend.
-- [**google/oboe**](https://github.com/google/oboe) — High-performance real-time audio library for Android.
-- [**FFmpeg**](https://ffmpeg.org) & [**libplist**](https://github.com/libimobiledevice/libplist) — Essential multimedia and Apple property list decoding libraries.
+```mermaid
+flowchart LR
+  subgraph Apple["iOS / macOS / iPadOS"]
+    CC["Control Center / Safari / Apps"]
+  end
 
----
+  subgraph Discovery["Discovery"]
+    MDNS["mDNS<br/>_airplay._tcp + _raop._tcp"]
+  end
 
-## 📄 License
+  subgraph Protocol["Protocol"]
+    RTSP["RTSP / FairPlay pairing"]
+    RTP["RTP A/V"]
+  end
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for details.
+  subgraph TV["Android TV · AirPlay TV"]
+    SVC["AirPlayService + NsdManager"]
+    UX["UxPlay native core"]
+    VID["MediaCodec H.264/H.265<br/>→ GL / Surface"]
+    AUD["FFmpeg ALAC/AAC<br/>→ Oboe path"]
+    HLS["Media3 ExoPlayer HLS"]
+    OTA["AppUpdateChecker<br/>→ GitHub Releases"]
+  end
+
+  CC --> MDNS --> SVC
+  CC --> RTSP --> UX
+  UX --> RTP
+  RTP --> VID
+  RTP --> AUD
+  RTSP --> HLS
+  OTA -.->|ABI-matched APK| SVC
+```
+
+## Install & upgrade
+
+1. Download from [Releases](https://github.com/zinw/airplay-tv/releases) (prefer `AirPlayTV-<version>-arm64-v8a.apk`).
+2. Sideload, e.g. `adb install -r AirPlayTV-1.0.23-arm64-v8a.apk`.
+3. **1.0.4+** shares one upload cert — overlay OK. From **1.0.1–1.0.3**, uninstall once first.
+
+In-app OTA checks `releases/latest` and picks the device ABI (then universal). Asset names must contain the ABI or `universal` (see `AppUpdateChecker`).
+
+## Usage
+
+Same Wi‑Fi, launch the app, Control Center → **Screen Mirroring**. Optional PIN from the home chip. See [USER_GUIDE.md](docs/USER_GUIDE.md).
+
+## Build from source
+
+```bash
+git clone --recursive https://github.com/zinw/airplay-tv.git
+cd airplay-tv
+./gradlew assembleRelease
+```
+
+Do **not** change `applicationId` (`com.flymop.airplaytv`) or the app name. Signing: committed `keystore/` (same cert as 1.0.4+). Toolchain notes: [building_and_debugging.md](docs/building_and_debugging.md).
+
+## Cutting a release (tag only)
+
+`app/build.gradle.kts` is the source of truth for `versionName` / `versionCode`. The tag **must** match `versionName` or CI fails.
+
+```bash
+# Bump versionCode + versionName, commit to main, then:
+git tag v1.0.24
+git push origin v1.0.24
+```
+
+Workflow: [`.github/workflows/release.yml`](.github/workflows/release.yml). Dry-run: `gh workflow run release.yml --ref <branch>` (artifacts only, no Release).
+
+```mermaid
+flowchart LR
+  A["Bump versionName/versionCode"] --> B["git tag vX.Y.Z"]
+  B --> C["Actions: assembleRelease"]
+  C --> D["GitHub Release assets"]
+  D --> E["In-app OTA"]
+```
+
+## Credits & license
+
+Originally based on [flymop/airplay-tv](https://github.com/flymop/airplay-tv); [UxPlay](https://github.com/FDH2/UxPlay), [android-airplay-server](https://github.com/jqssun/android-airplay-server), Oboe, FFmpeg, libplist. **GPL-3.0** — [LICENSE](LICENSE).

@@ -61,8 +61,8 @@ AirPlay RTP packets transmit timestamps (NTP/RTP). Network jitter can cause pack
 ### RAOP FLUSH / next-episode (v1.0.12)
 Screen-mirror continuous next-episode sends RTSP `FLUSH` with `RTP-Info: seq=N` while video keeps playing. Upstream UxPlay only invokes the `audio_flush` callback and **does not** call `raop_buffer_flush`; the RTP ring keeps the old `first_seqnum`. Dequeue then stalls on the unfilled hole until the 256-slot buffer fills (~2s of ALAC) — hard mute with picture already rolling. Seek-to-0 recovers because a large seq jump hits the enqueue auto-flush, or TEARDOWN empties the buffer. Patch `0009-flush-raop-buffer-on-rtsp-flush.patch` resets the ring to `next_seq` on FLUSH before the light codec/ring playthrough path.
 
-### FLUSH diagnostics (v1.0.13+)
-Tag **`AirPlayAudio`**: logs RTP-Info / `raop_buffer` / dequeue / auto-flush / PCM / audible events. From **v1.0.14**, interest is not FLUSH-only — also arms on seq jumps, holes, underruns, format/codec changes (system Screen Mirroring may never send RTSP FLUSH). A startup **BEACON** is shipped when the service/native server starts so remote ingest reachability can be verified independently. Failures never affect playback.
+### FLUSH / hole diagnostics
+Tag **`AirPlayAudio`**: RTP-Info / `raop_buffer` / dequeue / auto-flush / PCM events. Interest arms on FLUSH, seq jumps, holes, underruns, and format/codec changes (system Screen Mirroring may never send RTSP FLUSH). Local logcat only — no remote diagnostic shipping.
 
 ### Endianness on ARM Architectures
 Apple Lossless encodes header metadata in Big-Endian format. In `EndianPortable.c`, defining `TARGET_RT_LITTLE_ENDIAN` for ARM/ARM64 targets is critical:
