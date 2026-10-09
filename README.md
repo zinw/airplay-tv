@@ -87,7 +87,7 @@ flowchart LR
 2. 侧载安装，例如：
 
 ```bash
-adb install -r AirPlayTV-1.0.23-arm64-v8a.apk
+adb install -r AirPlayTV-1.0.24-arm64-v8a.apk
 ```
 
 3. **1.0.4 及以后**使用同一上传证书，可直接覆盖升级。若仍在 **1.0.1–1.0.3**，需先卸载再装新版。
@@ -228,7 +228,7 @@ flowchart LR
 ## Install & upgrade
 
 1. Download from [Releases](https://github.com/zinw/airplay-tv/releases) (prefer `AirPlayTV-<version>-arm64-v8a.apk`).
-2. Sideload, e.g. `adb install -r AirPlayTV-1.0.23-arm64-v8a.apk`.
+2. Sideload, e.g. `adb install -r AirPlayTV-1.0.24-arm64-v8a.apk`.
 3. **1.0.4+** shares one upload cert — overlay OK. From **1.0.1–1.0.3**, uninstall once first.
 
 In-app OTA checks `releases/latest` and picks the device ABI (then universal). Asset names must contain the ABI or `universal` (see `AppUpdateChecker`).
