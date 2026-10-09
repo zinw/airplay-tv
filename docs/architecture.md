@@ -78,4 +78,9 @@
 
 ### D. Video & Rendering Pipeline
 * Decoupled architecture: Native video frames $\rightarrow$ `MediaCodec` $\rightarrow$ `SurfaceTexture` $\rightarrow$ Dedicated OpenGL ES rendering thread $\rightarrow$ `SurfaceView`.
+
+### E. In-app OTA (`AppUpdateChecker` / `ApkInstaller`)
+* Queries `https://api.github.com/repos/zinw/airplay-tv/releases/latest`.
+* Prefers release assets whose names contain the device ABI (`arm64-v8a`, …), then `universal`.
+* Compares `versionCode:` in the release body (preferred) or SemVer from the tag (`vX.Y.Z`).
 * Decoder surface changes do not trigger codec re-initialization, preventing video freeze or black screens on window transitions.

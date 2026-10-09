@@ -36,7 +36,7 @@ AirPlay TV relies on four native submodules (`UxPlay`, `ffmpeg`, `libplist`, `op
 
 ```bash
 # Clone the repository with submodules
-git clone --recursive https://github.com/flymop/airplay-tv.git
+git clone --recursive https://github.com/zinw/airplay-tv.git
 cd airplay-tv
 
 # If cloned without --recursive:
@@ -87,25 +87,23 @@ AirPlay TV builds native `.so` binaries for:
 
 ## 🚀 4. Automated CI/CD Release Pipeline
 
-AirPlay TV includes an automated GitHub Actions workflow (`.github/workflows/release.yml`) configured for continuous release delivery:
+Tag-driven release workflow (`.github/workflows/release.yml`):
 
 ```
-[git push to main / master]
+[bump versionName/versionCode in app/build.gradle.kts → commit → git tag vX.Y.Z → push tag]
              │
-             ├── 1. Checkout repository with all submodules recursively
-             ├── 2. Provision JDK 17 (Temurin) & Gradle cache
-             ├── 3. Install NDK 27.0.12077973 & CMake 3.22.1 via sdkmanager
-             ├── 4. Extract 8-character commit hash version (v<SHORT_SHA>)
-             ├── 5. Build production release APK (./gradlew assembleRelease)
-             ├── 6. Generate SHA-256 checksums
-             └── 7. Create GitHub Release & publish APK assets via softprops/action-gh-release
+             ├── 1. Checkout with submodules; JDK 17 + Gradle cache; NDK/CMake cache
+             ├── 2. Fail if tag vX.Y.Z ≠ versionName X.Y.Z
+             ├── 3. ./gradlew assembleRelease (committed upload keystore)
+             ├── 4. Rename to AirPlayTV-<version>-<abi>.apk (+ universal)
+             ├── 5. SHA-256 sums; publish GitHub Release (body includes versionCode: N)
+             └── workflow_dispatch: same build, upload workflow artifact only (no Release)
 ```
 
-### Release Versioning
-- Releases are tagged using the 8-character commit hash (e.g. `vd89e2860`).
-- Artifacts:
-  - `AirPlayTV-<SHORT_SHA>-release.apk` (Signed production APK for all ABIs)
-  - `AirPlayTV-<SHORT_SHA>-release.apk.sha256` (SHA-256 verification checksum)
+### Release versioning
+- **Source of truth**: `versionName` / `versionCode` in `app/build.gradle.kts`.
+- **Tag rule**: push `v{versionName}` only after the bump is on the branch tip (CI rejects mismatches).
+- **Assets** (OTA-compatible names): `AirPlayTV-<version>-arm64-v8a.apk`, `…-armeabi-v7a.apk`, `…-x86_64.apk`, `…-universal.apk`, plus `.sha256` / `SHA256SUMS.txt`.
 
 ---
 
